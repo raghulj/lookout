@@ -1,0 +1,25 @@
+# Clippy linting configuration
+# Run with: cargo clippy
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 15
+
+# Documentation
+missing-docs-in-crate-items = false
+
+# Disallow certain methods
+disallowed-methods = [
+    # Prevent unwrap in production code (use proper error handling)
+    { path = "std::option::Option::unwrap", reason = "use proper error handling instead" },
+    { path = "std::result::Result::unwrap", reason = "use proper error handling instead" },
+    { path = "std::option::Option::expect", reason = "use proper error handling instead" },
+    { path = "std::result::Result::expect", reason = "use proper error handling instead" },
+]
+
+# Code size thresholds
+too-many-arguments-threshold = 8
+type-complexity-threshold = 250
+too-large-for-stack = 200
+
+# Verbose settings
+verbose-bit-mask-threshold = 1

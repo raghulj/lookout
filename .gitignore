@@ -1,0 +1,42 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Distribution
+*.deb
+*.rpm
+*.AppImage
+*.flatpak
+
+# Testing
+*.profraw
+*.profdata
+
+# Backup files
+*.bak
+*.tmp
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Project specific
+/resources/icons/*.generated
+config.json

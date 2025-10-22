@@ -1,0 +1,56 @@
+[package]
+name = "lookout"
+version = "0.1.0"
+edition = "2021"
+description = "A lightweight break reminder app for Linux - Developed and maintained entirely using Claude Code (AI)"
+license = "MIT"
+repository = "https://github.com/raghulj/lookout"
+
+[dependencies]
+# UI Framework
+gtk4 = "0.9"
+libadwaita = "0.7"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# System tray
+ksni = "0.2"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# System paths
+dirs = "5.0"
+
+# Logging (optional but recommended)
+log = "0.4"
+env_logger = "0.11"
+
+[dev-dependencies]
+# Testing utilities can be added here
+
+[profile.release]
+# Optimize for size and performance
+opt-level = "z"      # Optimize for size
+lto = true           # Enable link-time optimization
+codegen-units = 1    # Better optimization, slower compile
+strip = true         # Strip symbols from binary
+panic = "abort"      # Smaller binary size
+
+[profile.dev]
+# Fast compilation for development
+opt-level = 0
+
+# Make sure clippy is strict
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Allow some pedantic lints that are too strict
+module-name-repetitions = "allow"
+missing-errors-doc = "allow"
+missing-panics-doc = "allow"
+# Disable disallowed-methods warning for tests and .expect()
+disallowed-methods = "allow"
