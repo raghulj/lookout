@@ -1,16 +1,19 @@
 //! Settings window UI using GTK4 and libadwaita with sidebar navigation
 
 use crate::autostart::AutostartManager;
+use crate::break_window::BreakWindow;
 use crate::settings::Settings;
+use crate::timer::BreakType;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box as GtkBox, Button, Entry, ListBox, Orientation, ScrolledWindow, SpinButton, Stack,
+    Align, Box as GtkBox, Button, ColorButton, ListBox, Orientation, ScrolledWindow, SpinButton, Stack,
     Switch,
 };
 use libadwaita as adw;
 use libadwaita::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
 /// Settings window with sidebar navigation
 pub struct SettingsWindow {
@@ -428,6 +431,7 @@ impl SettingsWindow {
     }
 
     /// Build Appearance settings page
+    #[allow(clippy::too_many_lines)]
     fn build_appearance_page(&self, config: &crate::config::Config) -> ScrolledWindow {
         let scrolled = ScrolledWindow::new();
         scrolled.set_vexpand(true);
@@ -439,51 +443,52 @@ impl SettingsWindow {
         prefs_page.set_margin_end(24);
 
         let appearance_group = adw::PreferencesGroup::new();
-        appearance_group.set_title("Break Window Background");
+        appearance_group.set_title("Break Window Colors");
         appearance_group.set_description(Some("Customize the fullscreen break overlay"));
         appearance_group.set_margin_bottom(24);
 
         // Background color
         let bg_color_row = adw::ActionRow::new();
         bg_color_row.set_title("Background Color");
-        bg_color_row.set_subtitle("CSS rgba color value");
+        bg_color_row.set_subtitle("Click to choose a background color");
 
-        let bg_color_entry = Entry::new();
-        bg_color_entry.set_text(&config.background_color);
-        bg_color_entry.set_placeholder_text(Some("rgba(0, 0, 0, 0.95)"));
-        bg_color_entry.set_valign(Align::Center);
-        bg_color_entry.set_width_request(220);
-        bg_color_row.add_suffix(&bg_color_entry);
+        let bg_color_button = ColorButton::new();
+        if let Some(rgba) = parse_color_string(&config.background_color) {
+            bg_color_button.set_rgba(&rgba);
+        }
+        bg_color_button.set_valign(Align::Center);
+        bg_color_row.add_suffix(&bg_color_button);
         appearance_group.add(&bg_color_row);
+
+        // Text color
+        let text_color_row = adw::ActionRow::new();
+        text_color_row.set_title("Text Color");
+        text_color_row.set_subtitle("Click to choose a text color");
+
+        let text_color_button = ColorButton::new();
+        if let Some(rgba) = parse_color_string(&config.text_color) {
+            text_color_button.set_rgba(&rgba);
+        }
+        text_color_button.set_valign(Align::Center);
+        text_color_row.add_suffix(&text_color_button);
+        appearance_group.add(&text_color_row);
 
         prefs_page.add(&appearance_group);
 
         // Presets
         let presets_group = adw::PreferencesGroup::new();
         presets_group.set_title("Quick Presets");
-        presets_group.set_description(Some("Apply a preset color with one click"));
+        presets_group.set_description(Some("Apply preset color combinations"));
         presets_group.set_margin_bottom(24);
 
         let presets = vec![
-            ("Pure Black", "rgba(0, 0, 0, 1.0)", "Solid black background"),
-            (
-                "Dark Gray",
-                "rgba(0, 0, 0, 0.95)",
-                "Nearly opaque dark (default)",
-            ),
-            (
-                "Navy Blue",
-                "rgba(15, 23, 42, 0.95)",
-                "Dark blue with subtle tint",
-            ),
-            (
-                "Deep Purple",
-                "rgba(30, 20, 60, 0.95)",
-                "Purple-tinted dark background",
-            ),
+            ("Default Dark", "rgba(0, 0, 0, 0.95)", "rgba(255, 255, 255, 1.0)", "Black background with white text"),
+            ("Pure Black", "rgba(0, 0, 0, 1.0)", "rgba(255, 255, 255, 1.0)", "Solid black with white text"),
+            ("Navy Blue", "rgba(15, 23, 42, 0.95)", "rgba(226, 232, 240, 1.0)", "Dark blue with light gray text"),
+            ("Deep Purple", "rgba(30, 20, 60, 0.95)", "rgba(243, 232, 255, 1.0)", "Purple background with lavender text"),
         ];
 
-        for (name, color, description) in presets {
+        for (name, bg_color, text_color, description) in presets {
             let preset_row = adw::ActionRow::new();
             preset_row.set_title(name);
             preset_row.set_subtitle(description);
@@ -491,10 +496,18 @@ impl SettingsWindow {
             let apply_button = Button::with_label("Apply");
             apply_button.set_valign(Align::Center);
 
-            let entry_clone = bg_color_entry.clone();
-            let color_str = color.to_string();
+            let bg_button_clone = bg_color_button.clone();
+            let text_button_clone = text_color_button.clone();
+            let bg_color_str = bg_color.to_string();
+            let text_color_str = text_color.to_string();
+
             apply_button.connect_clicked(move |_| {
-                entry_clone.set_text(&color_str);
+                if let Some(rgba) = parse_color_string(&bg_color_str) {
+                    bg_button_clone.set_rgba(&rgba);
+                }
+                if let Some(rgba) = parse_color_string(&text_color_str) {
+                    text_button_clone.set_rgba(&rgba);
+                }
             });
 
             preset_row.add_suffix(&apply_button);
@@ -503,13 +516,44 @@ impl SettingsWindow {
 
         prefs_page.add(&presets_group);
 
-        // Save button
+        // Buttons
         let button_group = adw::PreferencesGroup::new();
         button_group.set_margin_top(12);
 
         let button_box = GtkBox::new(Orientation::Horizontal, 12);
         button_box.set_halign(Align::End);
 
+        // Preview button
+        let preview_button = Button::with_label("Preview");
+        preview_button.set_margin_top(8);
+        preview_button.set_margin_bottom(8);
+
+        let settings_for_preview = self.settings.clone();
+        let bg_button_for_preview = bg_color_button.clone();
+        let text_button_for_preview = text_color_button.clone();
+
+        preview_button.connect_clicked(move |_| {
+            let bg_rgba = bg_button_for_preview.rgba();
+            let text_rgba = text_button_for_preview.rgba();
+
+            let bg_color_str = rgba_to_string(&bg_rgba);
+            let text_color_str = rgba_to_string(&text_rgba);
+
+            // Create temporary config with selected colors
+            let mut temp_config = settings_for_preview.get();
+            temp_config.background_color = bg_color_str;
+            temp_config.text_color = text_color_str;
+
+            // Show preview break window
+            let break_window = BreakWindow::new(temp_config);
+            break_window.show(BreakType::Micro, Duration::from_secs(10));
+
+            log::info!("Showing preview with selected colors");
+        });
+
+        button_box.append(&preview_button);
+
+        // Save button
         let save_button = Button::with_label("Save Settings");
         save_button.add_css_class("suggested-action");
         save_button.set_margin_top(8);
@@ -517,8 +561,12 @@ impl SettingsWindow {
 
         let settings_clone = self.settings.clone();
         save_button.connect_clicked(move |_| {
+            let bg_rgba = bg_color_button.rgba();
+            let text_rgba = text_color_button.rgba();
+
             if let Err(e) = settings_clone.update(|cfg| {
-                cfg.background_color = bg_color_entry.text().to_string();
+                cfg.background_color = rgba_to_string(&bg_rgba);
+                cfg.text_color = rgba_to_string(&text_rgba);
             }) {
                 log::error!("Failed to save appearance settings: {e}");
             } else {
@@ -603,4 +651,37 @@ impl SettingsWindow {
             window.close();
         }
     }
+}
+
+/// Parse CSS rgba color string to GTK RGBA
+fn parse_color_string(color_str: &str) -> Option<gtk4::gdk::RGBA> {
+    // Try to parse rgba(r, g, b, a) format
+    if let Some(inner) = color_str.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+        if parts.len() == 4 {
+            if let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
+                parts[0].parse::<u8>(),
+                parts[1].parse::<u8>(),
+                parts[2].parse::<u8>(),
+                parts[3].parse::<f32>(),
+            ) {
+                let mut rgba = gtk4::gdk::RGBA::new(0.0, 0.0, 0.0, 1.0);
+                rgba.set_red(f32::from(r) / 255.0);
+                rgba.set_green(f32::from(g) / 255.0);
+                rgba.set_blue(f32::from(b) / 255.0);
+                rgba.set_alpha(a);
+                return Some(rgba);
+            }
+        }
+    }
+    None
+}
+
+/// Convert GTK RGBA to CSS rgba string
+fn rgba_to_string(rgba: &gtk4::gdk::RGBA) -> String {
+    let r = (rgba.red() * 255.0).round() as u8;
+    let g = (rgba.green() * 255.0).round() as u8;
+    let b = (rgba.blue() * 255.0).round() as u8;
+    let a = rgba.alpha();
+    format!("rgba({}, {}, {}, {})", r, g, b, a)
 }

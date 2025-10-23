@@ -25,6 +25,7 @@ fn get_desktop_entry_path() -> PathBuf {
     PathBuf::from(home).join(".local/share/applications/lookout.desktop")
 }
 
+#[allow(dead_code)]
 fn get_install_path() -> PathBuf {
     let home = env::var("HOME").expect("HOME environment variable not set");
     PathBuf::from(home).join(".local/bin/lookout")

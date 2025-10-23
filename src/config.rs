@@ -88,6 +88,9 @@ pub struct Config {
     /// Background color for break window (CSS rgba format)
     #[serde(default = "default_background_color")]
     pub background_color: String,
+    /// Text color for break window (CSS rgba format)
+    #[serde(default = "default_text_color")]
+    pub text_color: String,
     /// Break messages
     #[serde(default)]
     pub break_messages: BreakMessages,
@@ -95,6 +98,10 @@ pub struct Config {
 
 fn default_background_color() -> String {
     "rgba(0, 0, 0, 0.95)".to_string()
+}
+
+fn default_text_color() -> String {
+    "rgba(255, 255, 255, 1.0)".to_string()
 }
 
 impl Default for Config {
@@ -107,6 +114,7 @@ impl Default for Config {
             auto_start: true,
             enabled: true,
             background_color: default_background_color(),
+            text_color: default_text_color(),
             break_messages: BreakMessages::default(),
         }
     }

@@ -11,6 +11,7 @@ use tokio::sync::mpsc;
 struct LookoutTray {
     settings: Settings,
     tooltip: Arc<RwLock<String>>,
+    #[allow(dead_code)] // Used in menu activate closures
     test_break_tx: mpsc::UnboundedSender<BreakType>,
 }
 
