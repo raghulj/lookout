@@ -2,8 +2,9 @@
 
 use crate::config::Config;
 use crate::timer::BreakType;
+use gtk4::glib;
 use gtk4::prelude::*;
-use gtk4::{Align, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
+use gtk4::{Align, ApplicationWindow, Box as GtkBox, Button, DrawingArea, Label, Orientation, Overlay};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
@@ -35,20 +36,17 @@ impl BreakWindow {
             .decorated(false)
             .build();
 
-        // Add CSS class for styling
-        window.add_css_class("break-window");
+        // Set window background color using native GTK
+        // Parse RGBA color from config
+        let bg_color = parse_rgba(&self.config.background_color);
 
-        // Apply dynamic background color from config
-        let css_provider = gtk4::CssProvider::new();
-        let background_css = format!(
-            ".break-window {{ background: {}; }}",
-            self.config.background_color
-        );
-        css_provider.load_from_data(&background_css);
-
-        window
-            .style_context()
-            .add_provider(&css_provider, gtk4::STYLE_PROVIDER_PRIORITY_USER);
+        // Create a drawing area to paint the background
+        let drawing_area = gtk4::DrawingArea::new();
+        drawing_area.set_draw_func(move |_, cr, width, height| {
+            cr.set_source_rgba(bg_color.0, bg_color.1, bg_color.2, bg_color.3);
+            let _ = cr.rectangle(0.0, 0.0, width as f64, height as f64);
+            let _ = cr.fill();
+        });
 
         // Create main container
         let main_box = GtkBox::new(Orientation::Vertical, 0);
@@ -61,7 +59,6 @@ impl BreakWindow {
         top_box.set_margin_top(32);
 
         let time_label = Label::new(None);
-        time_label.add_css_class("current-time");
         update_current_time(&time_label);
         top_box.append(&time_label);
 
@@ -82,7 +79,7 @@ impl BreakWindow {
         // Main heading - random selection
         let heading = self.config.break_messages.random_heading();
         let heading_label = Label::new(Some(heading));
-        heading_label.add_css_class("break-heading");
+        heading_label.set_markup(&format!("<span size='56000' weight='bold'>{}</span>", glib::markup_escape_text(heading)));
         center_box.append(&heading_label);
 
         // Instruction message - random selection based on break type
@@ -92,7 +89,7 @@ impl BreakWindow {
         };
 
         let instruction_label = Label::new(Some(instruction));
-        instruction_label.add_css_class("break-instruction");
+        instruction_label.set_markup(&format!("<span size='20000'>{}</span>", glib::markup_escape_text(instruction)));
         instruction_label.set_wrap(true);
         instruction_label.set_max_width_chars(60);
         instruction_label.set_justify(gtk4::Justification::Center);
@@ -101,30 +98,24 @@ impl BreakWindow {
         // Countdown timer with flip animation
         let timer_box = GtkBox::new(Orientation::Horizontal, 12);
         timer_box.set_halign(Align::Center);
-        timer_box.add_css_class("countdown-container");
 
         let remaining_secs = Rc::new(RefCell::new(duration.as_secs()));
 
         // Create individual labels for MM:SS format
         let minute_tens = Label::new(Some("0"));
-        minute_tens.add_css_class("break-countdown");
-        minute_tens.add_css_class("countdown-digit");
+        minute_tens.set_markup("<span size='120000'>0</span>");
 
         let minute_ones = Label::new(Some("0"));
-        minute_ones.add_css_class("break-countdown");
-        minute_ones.add_css_class("countdown-digit");
+        minute_ones.set_markup("<span size='120000'>0</span>");
 
         let colon_label = Label::new(Some(":"));
-        colon_label.add_css_class("break-countdown");
-        colon_label.add_css_class("countdown-separator");
+        colon_label.set_markup("<span size='120000'>:</span>");
 
         let second_tens = Label::new(Some("0"));
-        second_tens.add_css_class("break-countdown");
-        second_tens.add_css_class("countdown-digit");
+        second_tens.set_markup("<span size='120000'>0</span>");
 
         let second_ones = Label::new(Some("0"));
-        second_ones.add_css_class("break-countdown");
-        second_ones.add_css_class("countdown-digit");
+        second_ones.set_markup("<span size='120000'>0</span>");
 
         // Set initial values
         update_countdown_digits(
@@ -150,7 +141,7 @@ impl BreakWindow {
 
         // Skip button (with chevron icon)
         let skip_button = Button::with_label("⏩ Skip");
-        skip_button.add_css_class("break-skip-button");
+        skip_button.set_size_request(140, 48);
 
         button_box.append(&skip_button);
 
@@ -158,12 +149,17 @@ impl BreakWindow {
 
         // Bottom hint text
         let hint_label = Label::new(Some("Press Esc twice to skip"));
-        hint_label.add_css_class("break-hint");
+        hint_label.set_markup("<span size='14000'>Press Esc twice to skip</span>");
         hint_label.set_margin_bottom(32);
         hint_label.set_margin_top(24);
         center_box.append(&hint_label);
 
         main_box.append(&center_box);
+
+        // Create overlay to have drawing area as background
+        let overlay = gtk4::Overlay::new();
+        overlay.set_child(Some(&drawing_area));
+        overlay.add_overlay(&main_box);
 
         // Update countdown every second
         let minute_tens_weak = minute_tens.downgrade();
@@ -230,7 +226,7 @@ impl BreakWindow {
 
         window.add_controller(key_controller);
 
-        window.set_child(Some(&main_box));
+        window.set_child(Some(&overlay));
 
         // Store window reference
         *self.window.borrow_mut() = Some(window.clone());
@@ -288,8 +284,31 @@ fn update_countdown_digits(
     let sec_tens = seconds / 10;
     let sec_ones = seconds % 10;
 
-    minute_tens.set_text(&min_tens.to_string());
-    minute_ones.set_text(&min_ones.to_string());
-    second_tens.set_text(&sec_tens.to_string());
-    second_ones.set_text(&sec_ones.to_string());
+    minute_tens.set_markup(&format!("<span size='120000'>{}</span>", min_tens));
+    minute_ones.set_markup(&format!("<span size='120000'>{}</span>", min_ones));
+    second_tens.set_markup(&format!("<span size='120000'>{}</span>", sec_tens));
+    second_ones.set_markup(&format!("<span size='120000'>{}</span>", sec_ones));
+}
+
+/// Parse RGBA color string to tuple (r, g, b, a)
+fn parse_rgba(color_str: &str) -> (f64, f64, f64, f64) {
+    // Default to black with 95% opacity
+    let default = (0.0, 0.0, 0.0, 0.95);
+
+    // Try to parse rgba(r, g, b, a) format
+    if let Some(inner) = color_str.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+        if parts.len() == 4 {
+            if let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
+                parts[0].parse::<u8>(),
+                parts[1].parse::<u8>(),
+                parts[2].parse::<u8>(),
+                parts[3].parse::<f64>(),
+            ) {
+                return (r as f64 / 255.0, g as f64 / 255.0, b as f64 / 255.0, a);
+            }
+        }
+    }
+
+    default
 }
