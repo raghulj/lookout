@@ -1,202 +1,12 @@
-# Lookout App for Linux
+# Lookout
 
-A lightweight, native break reminder application for Linux that helps reduce eye strain and digital fatigue through micro breaks and long breaks.
+A lightweight break reminder app for Linux that helps reduce eye strain and digital fatigue through micro breaks and long breaks.
 
-## Project Overview
+Built with Rust, GTK4, and libadwaita. Runs in the system tray with <10MB memory footprint.
 
-A simple, memory-efficient break reminder app that runs in the system tray and provides fullscreen break overlays. Designed to work across all major Linux desktop environments with both X11 and Wayland support.
+---
 
-## Core Features
-
-### Must-Have Features
-- **Two Break Types**
-  - Micro breaks (e.g., 20-second breaks every 20 minutes)
-  - Long breaks (e.g., 5-minute breaks every 60 minutes)
-  
-- **System Tray Integration**
-  - Runs in background with system tray icon
-  - Shows next break time
-  - Right-click menu for quick actions
-  
-- **Break Overlays**
-  - Fullscreen semi-transparent overlay during breaks
-  - Countdown timer display
-  - Skip button (optional)
-  
-- **Settings Window**
-  - Configure micro break interval and duration
-  - Configure long break interval and duration
-  - Start/Pause/Resume functionality
-  - Auto-start on system boot option
-
-### Design Requirements
-- Minimal, clean UI following modern Linux design principles
-- Low memory footprint (target: <10MB idle)
-- Native look and feel on Linux
-- Smooth animations and transitions
-
-## Technical Stack
-
-### Core Technologies
-- **Language**: Rust
-- **UI Framework**: GTK4
-- **Styling**: libadwaita (for modern GNOME aesthetic)
-- **Async Runtime**: tokio
-- **System Tray**: ksni (KDE Status Notifier Item)
-
-### Key Dependencies
-
-```toml
-[dependencies]
-gtk4 = "0.9"
-libadwaita = "0.7"
-tokio = { version = "1.0", features = ["full"] }
-ksni = "0.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-dirs = "5.0"
-```
-
-## Architecture
-
-### Application Components
-
-1. **System Tray Service**
-   - Manages tray icon and menu
-   - Displays next break countdown
-   - Provides quick actions (pause, settings, quit)
-
-2. **Timer Engine**
-   - Tokio-based async timers
-   - Tracks micro break and long break intervals
-   - Handles pause/resume state
-
-3. **Settings Window (GTK4)**
-   - Configuration UI for break intervals
-   - Preferences management
-   - Persistent settings storage (JSON in `~/.config/lookout/`)
-
-4. **Break Overlay Window (GTK4)**
-   - Fullscreen window with semi-transparent background
-   - Countdown display
-   - Skip button with minimum wait time
-   - Auto-dismisses when break completes
-
-### Display Server Support
-
-GTK4 automatically handles both X11 and Wayland:
-- No conditional compilation needed
-- GTK4 detects display server at runtime
-- Single codebase works on both
-
-### Desktop Environment Compatibility
-
-**Fully Supported (System Tray Works Out of Box):**
-- KDE Plasma
-- XFCE
-- MATE
-- Cinnamon
-- LXQt
-- Tiling WMs with compatible status bars (i3, Sway with waybar, etc.)
-
-**GNOME Support:**
-- Requires AppIndicator extension
-- Document this requirement in installation instructions
-- Consider detecting GNOME and showing one-time notification
-
-## Memory & Performance Targets
-
-- **Idle in tray**: 3-7 MB
-- **With settings window open**: 8-12 MB
-- **During break overlay**: 8-12 MB
-- **Binary size**: ~5-8 MB (stripped)
-
-## File Structure
-
-```
-lookout/
-├── src/
-│   ├── main.rs              # Entry point
-│   ├── app.rs               # GTK Application setup
-│   ├── tray.rs              # System tray implementation
-│   ├── timer.rs             # Break timer logic
-│   ├── settings.rs          # Settings management
-│   ├── settings_window.rs   # Settings UI
-│   ├── break_window.rs      # Break overlay UI
-│   └── config.rs            # Configuration persistence
-├── resources/
-│   ├── icons/               # App and tray icons
-│   └── style.css            # Custom GTK styles
-├── Cargo.toml
-└── README.md
-```
-
-## Configuration Storage
-
-Settings stored in: `~/.config/lookout/config.json`
-
-```json
-{
-  "micro_break_interval_minutes": 20,
-  "micro_break_duration_seconds": 20,
-  "long_break_interval_minutes": 60,
-  "long_break_duration_minutes": 5,
-  "auto_start": true,
-  "enabled": true
-}
-```
-
-## User Experience Flow
-
-### First Run
-1. App starts and creates tray icon
-2. Shows welcome notification with quick settings overview
-3. Begins timer countdown
-4. If on GNOME without AppIndicator, show one-time setup instruction
-
-### During Use
-1. Tray icon shows next break time on hover
-2. Icon changes color/style as break approaches (optional)
-3. Break window appears fullscreen at scheduled time
-4. User waits for break or skips (after minimum time)
-5. App returns to background
-
-### Tray Menu Options
-- "Next break in X minutes" (informational)
-- "Pause breaks" / "Resume breaks"
-- "Settings"
-- "About"
-- "Quit"
-
-## Development Guidelines
-
-### Code Style
-- Follow Rust standard formatting (rustfmt)
-- Use Clippy for linting
-- Comprehensive error handling (no unwrap in production code)
-- Document public APIs
-
-### Testing
-- Unit tests for timer logic
-- Integration tests for settings persistence
-- Manual testing across multiple desktop environments
-
-### Build Instructions
-
-```bash
-# Development build
-cargo build
-
-# Release build (optimized)
-cargo build --release
-
-# Strip binary for minimal size
-strip target/release/lookout
-```
-
-## Installation
-
-### Quick Install (Recommended)
+## 🚀 Quick Install
 
 Install Lookout with a single command:
 
@@ -204,17 +14,16 @@ Install Lookout with a single command:
 curl -fsSL https://raw.githubusercontent.com/raghulj/lookout/main/install.sh | bash
 ```
 
-This will:
-- ✅ Detect your system architecture automatically
-- ✅ Download the latest release binary
-- ✅ Install to `~/.local/bin/lookout` (no sudo required)
-- ✅ Set up desktop entry for app launcher
-- ✅ Add to PATH if needed
-- ✅ Check for required dependencies (GTK4, libadwaita)
+**That's it!** The installer will:
+- ✅ Detect your system automatically
+- ✅ Download the latest release
+- ✅ Install to `~/.local/bin` (no sudo required)
+- ✅ Set up desktop entry
+- ✅ Check for required dependencies
 
 ### Requirements
 
-Lookout requires GTK4 and libadwaita to be installed on your system:
+Lookout requires GTK4 and libadwaita:
 
 **Ubuntu/Debian:**
 ```bash
@@ -231,20 +40,25 @@ sudo dnf install gtk4 libadwaita
 sudo pacman -S gtk4 libadwaita
 ```
 
-### Usage
+---
 
-After installation, you can:
+## 📖 Usage
 
 **Start the app:**
 ```bash
 lookout
 ```
 
-Or find it in your application launcher.
+Or find **Lookout** in your application launcher.
 
 **Enable autostart:**
 ```bash
 lookout --enable-autostart
+```
+
+**Disable autostart:**
+```bash
+lookout --disable-autostart
 ```
 
 **Check version:**
@@ -257,74 +71,231 @@ lookout --version
 lookout --help
 ```
 
-### Updating
+---
 
-To update to the latest version, simply run the install command again:
+## 🔄 Updating
+
+To update to the latest version, run the install command again:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/raghulj/lookout/main/install.sh | bash
 ```
 
-### Uninstalling
+---
+
+## 🗑️ Uninstalling
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/raghulj/lookout/main/uninstall.sh | bash
 ```
 
-### Manual Installation
+---
 
-If you prefer to install manually:
+## ✨ Features
 
-1. Download the binary for your architecture from the [latest release](https://github.com/raghulj/lookout/releases/latest)
-2. Make it executable: `chmod +x lookout-*`
-3. Move to your PATH: `mv lookout-* ~/.local/bin/lookout`
+### Two Break Types
+- **Micro breaks** - 20-second breaks every 20 minutes (customizable)
+- **Long breaks** - 5-minute breaks every 60 minutes (customizable)
 
-### Supported Architectures
+### System Tray Integration
+- Runs quietly in the background
+- Shows next break time
+- Right-click menu for quick actions
+- Pause/resume breaks anytime
 
-- **x86_64** (Intel/AMD 64-bit) - Primary support
-- **aarch64** (ARM 64-bit) - Planned
-- **armv7** (ARM 32-bit) - Planned
+### Break Overlays
+- Fullscreen semi-transparent overlay
+- Countdown timer display
+- Skip button (after minimum duration)
+- Works on both X11 and Wayland
 
-## Known Limitations
+### Settings Window
+- Configure break intervals and durations
+- Start/pause/resume functionality
+- Auto-start on login option
+- Remembers your preferences
 
-1. **GNOME System Tray**: Requires AppIndicator extension
-2. **Idle Detection**: Basic version doesn't detect user idle time (future enhancement)
-3. **Multi-Monitor**: Break overlay shows on primary monitor only (v1.0)
-
-## Future Enhancements (Post-MVP)
-
-- Idle time detection (don't start break if user already away)
-- Multi-monitor support
-- Break exercise suggestions/animations
-- Statistics and usage insights
-- Sound notifications (optional)
-- Theme customization
-- Pomodoro mode
-
-## Success Criteria
-
-- Runs reliably in background consuming <10MB RAM
-- Works on Ubuntu, Fedora, Arch, and openSUSE without modification
-- System tray icon visible on KDE, XFCE, MATE, Cinnamon
-- Break overlays work smoothly on both X11 and Wayland
-- Settings persist across restarts
-- Clean, intuitive UI that follows Linux desktop conventions
-
-## Developer Resources
-
-- [GTK4 Rust Book](https://gtk-rs.org/gtk4-rs/stable/latest/book/)
-- [libadwaita Documentation](https://gnome.pages.gitlab.gnome.org/libadwaita/)
-- [ksni Crate Documentation](https://docs.rs/ksni/)
-- [GNOME Human Interface Guidelines](https://developer.gnome.org/hig/)
-
-## License
-
-[Choose appropriate license - MIT, GPL-3.0, Apache-2.0, etc.]
-
-## Contributing
-
-[Add contribution guidelines if open source]
+### Design Highlights
+- Minimal, clean UI following GNOME HIG
+- Low memory footprint (<10MB idle)
+- Native look and feel
+- Smooth animations
 
 ---
 
-**Project Goal**: Create the simplest, most efficient break reminder app for Linux that just works across all desktop environments.
+## 🖥️ Desktop Environment Support
+
+### Fully Supported (System Tray Works Out of the Box)
+- KDE Plasma ✅
+- XFCE ✅
+- MATE ✅
+- Cinnamon ✅
+- LXQt ✅
+- Tiling WMs with compatible bars (i3, Sway with waybar, etc.) ✅
+
+### GNOME Support
+Requires [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/)
+
+---
+
+## 🏗️ Technical Stack
+
+- **Language**: Rust
+- **UI Framework**: GTK4
+- **Styling**: libadwaita
+- **Async Runtime**: tokio
+- **System Tray**: ksni (KDE Status Notifier Item)
+
+### Display Server Support
+- **X11** ✅
+- **Wayland** ✅
+
+GTK4 automatically handles both - single codebase, works everywhere.
+
+---
+
+## 📦 Manual Installation
+
+If you prefer to install manually:
+
+1. Download the binary for your architecture from [releases](https://github.com/raghulj/lookout/releases/latest)
+2. Make it executable:
+   ```bash
+   chmod +x lookout-x86_64-unknown-linux-gnu
+   ```
+3. Move to your PATH:
+   ```bash
+   mkdir -p ~/.local/bin
+   mv lookout-x86_64-unknown-linux-gnu ~/.local/bin/lookout
+   ```
+4. Add to PATH (if not already):
+   ```bash
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+### Supported Architectures
+- **x86_64** (Intel/AMD 64-bit) - Available now
+- **aarch64** (ARM 64-bit) - Planned
+- **armv7** (ARM 32-bit) - Planned
+
+---
+
+## ⚙️ Configuration
+
+Settings are stored in: `~/.config/lookout/config.json`
+
+```json
+{
+  "micro_break_interval_minutes": 20,
+  "micro_break_duration_seconds": 20,
+  "long_break_interval_minutes": 60,
+  "long_break_duration_minutes": 5,
+  "auto_start": true,
+  "enabled": true
+}
+```
+
+You can edit this file directly or use the settings window in the app.
+
+---
+
+## 🛠️ Building from Source
+
+### Prerequisites
+
+```bash
+# Ubuntu/Debian
+sudo apt install libgtk-4-dev libadwaita-1-dev libdbus-1-dev build-essential pkg-config
+
+# Fedora
+sudo dnf install gtk4-devel libadwaita-devel dbus-devel gcc pkg-config
+
+# Arch Linux
+sudo pacman -S gtk4 libadwaita dbus base-devel
+```
+
+### Build
+
+```bash
+# Clone the repository
+git clone https://github.com/raghulj/lookout.git
+cd lookout
+
+# Build release binary
+cargo build --release
+
+# Binary will be at: target/release/lookout
+./target/release/lookout
+```
+
+---
+
+## 🎯 Project Goals
+
+- Simple, efficient break reminder that just works
+- Native Linux application (not Electron!)
+- Minimal memory footprint (<10MB)
+- Works across all major desktop environments
+- Respects user privacy (no telemetry, no network calls)
+
+---
+
+## 📝 Known Limitations
+
+1. **GNOME System Tray**: Requires AppIndicator extension
+2. **Idle Detection**: Not implemented yet (breaks trigger on schedule regardless of user activity)
+3. **Multi-Monitor**: Break overlay shows on primary monitor only (v1.0)
+
+---
+
+## 🚧 Future Enhancements
+
+- [ ] Idle time detection
+- [ ] Multi-monitor support
+- [ ] Break exercise suggestions/animations
+- [ ] Statistics and usage insights
+- [ ] Sound notifications
+- [ ] Theme customization
+- [ ] Pomodoro mode
+- [ ] Flatpak package
+- [ ] AUR package (Arch User Repository)
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
+
+### Development Setup
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+
+### Reporting Issues
+
+Found a bug or have a feature request? [Open an issue](https://github.com/raghulj/lookout/issues/new)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- Built entirely using [Claude Code](https://claude.com/claude-code) (AI pair programmer)
+- Inspired by the need for simple, native break reminder apps on Linux
+- Thanks to the GTK and Rust communities for excellent tooling
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/raghulj/lookout/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/raghulj/lookout/discussions)
+
+---
+
+**Star ⭐ this repository if you find it useful!**
