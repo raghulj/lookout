@@ -194,27 +194,96 @@ cargo build --release
 strip target/release/lookout
 ```
 
-## Installation & Distribution
+## Installation
 
-### Package Formats
-- **Primary**: AppImage (universal, no dependencies)
-- **Secondary**: Flatpak (sandboxed, broader reach)
-- **Optional**: .deb and .rpm packages
+### Quick Install (Recommended)
 
-### Desktop Entry
-Install to: `~/.local/share/applications/lookout.desktop`
+Install Lookout with a single command:
 
-```ini
-[Desktop Entry]
-Name=Lookout
-Comment=Helps reduce eye strain with periodic breaks
-Exec=/path/to/lookout
-Icon=lookout
-Type=Application
-Categories=Utility;
-StartupNotify=false
-X-GNOME-Autostart-enabled=true
+```bash
+curl -fsSL https://raw.githubusercontent.com/raghulj/lookout/main/install.sh | bash
 ```
+
+This will:
+- ✅ Detect your system architecture automatically
+- ✅ Download the latest release binary
+- ✅ Install to `~/.local/bin/lookout` (no sudo required)
+- ✅ Set up desktop entry for app launcher
+- ✅ Add to PATH if needed
+- ✅ Check for required dependencies (GTK4, libadwaita)
+
+### Requirements
+
+Lookout requires GTK4 and libadwaita to be installed on your system:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install libgtk-4-1 libadwaita-1-0
+```
+
+**Fedora:**
+```bash
+sudo dnf install gtk4 libadwaita
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S gtk4 libadwaita
+```
+
+### Usage
+
+After installation, you can:
+
+**Start the app:**
+```bash
+lookout
+```
+
+Or find it in your application launcher.
+
+**Enable autostart:**
+```bash
+lookout --enable-autostart
+```
+
+**Check version:**
+```bash
+lookout --version
+```
+
+**Get help:**
+```bash
+lookout --help
+```
+
+### Updating
+
+To update to the latest version, simply run the install command again:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/raghulj/lookout/main/install.sh | bash
+```
+
+### Uninstalling
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/raghulj/lookout/main/uninstall.sh | bash
+```
+
+### Manual Installation
+
+If you prefer to install manually:
+
+1. Download the binary for your architecture from the [latest release](https://github.com/raghulj/lookout/releases/latest)
+2. Make it executable: `chmod +x lookout-*`
+3. Move to your PATH: `mv lookout-* ~/.local/bin/lookout`
+
+### Supported Architectures
+
+- **x86_64** (Intel/AMD 64-bit) - Primary support
+- **aarch64** (ARM 64-bit) - Planned
+- **armv7** (ARM 32-bit) - Planned
 
 ## Known Limitations
 
