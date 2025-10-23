@@ -1,6 +1,6 @@
 [package]
 name = "lookout"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A lightweight break reminder app for Linux - Developed and maintained entirely using Claude Code (AI)"
 license = "MIT"
