@@ -196,14 +196,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_timer_creation() {
-        let config = Config {
-            micro_break_interval_minutes: 20,
-            micro_break_duration_seconds: 20,
-            long_break_interval_minutes: 60,
-            long_break_duration_minutes: 5,
-            auto_start: true,
-            enabled: true,
-        };
+        let config = Config::default();
 
         let timer = TimerEngine::new(config);
         assert_eq!(timer.state().await, TimerState::Running);

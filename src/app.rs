@@ -1,6 +1,9 @@
 //! Main application setup and GTK initialization
 
-use crate::{break_window::BreakWindow, settings::Settings, timer::TimerEngine, tray::TrayService};
+use crate::{
+    autostart::AutostartManager, break_window::BreakWindow, settings::Settings, timer::TimerEngine,
+    tray::TrayService,
+};
 use gtk4::prelude::*;
 use gtk4::{glib, Application};
 use std::error::Error;
@@ -58,13 +61,20 @@ impl LookoutApp {
 
             // Initialize timer engine
             let config = settings.get();
-            let config_clone = config.clone();
-            let timer = Arc::new(TimerEngine::new(config));
+
+            // Sync autostart state on startup
+            if let Err(e) = AutostartManager::sync(config.auto_start) {
+                log::warn!("Failed to sync autostart setting on startup: {e}");
+            }
+
+            let timer = Arc::new(TimerEngine::new(config.clone()));
 
             // Subscribe to break events
             let mut event_receiver = timer.subscribe();
 
             // Handle break events on GTK main thread
+            // Clone settings to use in the event handler
+            let settings_clone = settings.clone();
             glib::spawn_future_local(async move {
                 while let Ok(event) = event_receiver.recv().await {
                     log::debug!("Received break event: {event:?}");
@@ -72,7 +82,9 @@ impl LookoutApp {
                     match event {
                         crate::timer::BreakEvent::BreakStarted(break_type, duration) => {
                             log::info!("Break started: {break_type:?} for {duration:?}");
-                            let break_window = BreakWindow::new(config_clone.clone());
+                            // Get fresh config each time to pick up any setting changes
+                            let current_config = settings_clone.get();
+                            let break_window = BreakWindow::new(current_config);
                             break_window.show(break_type, duration);
                         }
                         crate::timer::BreakEvent::BreakEnded(break_type) => {
@@ -83,11 +95,16 @@ impl LookoutApp {
                 }
             });
 
-            // Start timer in background
-            let timer_clone = Arc::clone(&timer);
-            tokio::spawn(async move {
-                timer_clone.start().await;
-            });
+            // Start timer in background only if enabled
+            if config.enabled {
+                log::info!("Break reminders are enabled - starting timer");
+                let timer_clone = Arc::clone(&timer);
+                tokio::spawn(async move {
+                    timer_clone.start().await;
+                });
+            } else {
+                log::info!("Break reminders are disabled - timer not started");
+            }
 
             // Initialize system tray
             let (mut tray, mut test_break_rx) = TrayService::new(settings.clone());

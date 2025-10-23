@@ -1,4 +1,5 @@
 mod app;
+mod autostart;
 mod break_window;
 mod config;
 mod settings;

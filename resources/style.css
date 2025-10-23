@@ -58,8 +58,7 @@
 }
 
 /* Button styling */
-.break-skip-button,
-.break-lock-button {
+.break-skip-button {
     min-width: 140px;
     min-height: 48px;
     font-size: 16px;
@@ -71,14 +70,12 @@
     padding: 12px 24px;
 }
 
-.break-skip-button:hover,
-.break-lock-button:hover {
+.break-skip-button:hover {
     background-color: rgba(255, 255, 255, 0.25);
     border-color: rgba(255, 255, 255, 0.3);
 }
 
-.break-skip-button:active,
-.break-lock-button:active {
+.break-skip-button:active {
     background-color: rgba(255, 255, 255, 0.3);
 }
 

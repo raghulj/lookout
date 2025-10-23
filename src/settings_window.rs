@@ -1,5 +1,6 @@
 //! Settings window UI using GTK4 and libadwaita with sidebar navigation
 
+use crate::autostart::AutostartManager;
 use crate::settings::Settings;
 use gtk4::prelude::*;
 use gtk4::{
@@ -214,13 +215,22 @@ impl SettingsWindow {
 
         let settings_clone = self.settings.clone();
         save_button.connect_clicked(move |_| {
+            let new_auto_start = autostart_switch.is_active();
+
             if let Err(e) = settings_clone.update(|cfg| {
                 cfg.enabled = enabled_switch.is_active();
-                cfg.auto_start = autostart_switch.is_active();
+                cfg.auto_start = new_auto_start;
             }) {
                 log::error!("Failed to save general settings: {e}");
             } else {
                 log::info!("General settings saved successfully");
+
+                // Sync autostart state with system
+                if let Err(e) = AutostartManager::sync(new_auto_start) {
+                    log::error!("Failed to sync autostart setting: {e}");
+                } else {
+                    log::info!("Autostart setting synced successfully");
+                }
             }
         });
 
@@ -346,18 +356,14 @@ impl SettingsWindow {
         info_group.set_margin_bottom(24);
         let info_row = adw::ActionRow::new();
         info_row.set_title("Random Message Selection");
-        info_row.set_subtitle(
-            "One message from each group is randomly selected every break",
-        );
+        info_row.set_subtitle("One message from each group is randomly selected every break");
         info_group.add(&info_row);
         prefs_page.add(&info_group);
 
         // Headings group
         let headings_group = adw::PreferencesGroup::new();
         headings_group.set_title("Break Headings");
-        headings_group.set_description(Some(
-            "Main messages shown at the top of break screens",
-        ));
+        headings_group.set_description(Some("Main messages shown at the top of break screens"));
         headings_group.set_margin_bottom(24);
 
         for (i, heading) in config.break_messages.headings.iter().enumerate() {
@@ -374,7 +380,12 @@ impl SettingsWindow {
         micro_group.set_description(Some("Instructions for 20-second eye rest breaks"));
         micro_group.set_margin_bottom(24);
 
-        for (i, instruction) in config.break_messages.micro_break_instructions.iter().enumerate() {
+        for (i, instruction) in config
+            .break_messages
+            .micro_break_instructions
+            .iter()
+            .enumerate()
+        {
             let row = adw::ActionRow::new();
             row.set_title(&format!("{}. {}", i + 1, instruction));
             micro_group.add(&row);
@@ -388,7 +399,12 @@ impl SettingsWindow {
         long_group.set_description(Some("Instructions for 5-minute movement breaks"));
         long_group.set_margin_bottom(24);
 
-        for (i, instruction) in config.break_messages.long_break_instructions.iter().enumerate() {
+        for (i, instruction) in config
+            .break_messages
+            .long_break_instructions
+            .iter()
+            .enumerate()
+        {
             let row = adw::ActionRow::new();
             row.set_title(&format!("{}. {}", i + 1, instruction));
             long_group.add(&row);
@@ -450,9 +466,21 @@ impl SettingsWindow {
 
         let presets = vec![
             ("Pure Black", "rgba(0, 0, 0, 1.0)", "Solid black background"),
-            ("Dark Gray", "rgba(0, 0, 0, 0.95)", "Nearly opaque dark (default)"),
-            ("Navy Blue", "rgba(15, 23, 42, 0.95)", "Dark blue with subtle tint"),
-            ("Deep Purple", "rgba(30, 20, 60, 0.95)", "Purple-tinted dark background"),
+            (
+                "Dark Gray",
+                "rgba(0, 0, 0, 0.95)",
+                "Nearly opaque dark (default)",
+            ),
+            (
+                "Navy Blue",
+                "rgba(15, 23, 42, 0.95)",
+                "Dark blue with subtle tint",
+            ),
+            (
+                "Deep Purple",
+                "rgba(30, 20, 60, 0.95)",
+                "Purple-tinted dark background",
+            ),
         ];
 
         for (name, color, description) in presets {
@@ -529,7 +557,9 @@ impl SettingsWindow {
 
         let desc_row = adw::ActionRow::new();
         desc_row.set_title("Description");
-        desc_row.set_subtitle("A lightweight break reminder app to reduce eye strain and promote healthy breaks");
+        desc_row.set_subtitle(
+            "A lightweight break reminder app to reduce eye strain and promote healthy breaks",
+        );
         about_group.add(&desc_row);
 
         prefs_page.add(&about_group);

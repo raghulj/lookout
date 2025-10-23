@@ -38,6 +38,18 @@ impl BreakWindow {
         // Add CSS class for styling
         window.add_css_class("break-window");
 
+        // Apply dynamic background color from config
+        let css_provider = gtk4::CssProvider::new();
+        let background_css = format!(
+            ".break-window {{ background: {}; }}",
+            self.config.background_color
+        );
+        css_provider.load_from_data(&background_css);
+
+        window
+            .style_context()
+            .add_provider(&css_provider, gtk4::STYLE_PROVIDER_PRIORITY_USER);
+
         // Create main container
         let main_box = GtkBox::new(Orientation::Vertical, 0);
         main_box.set_halign(Align::Fill);
@@ -115,7 +127,13 @@ impl BreakWindow {
         second_ones.add_css_class("countdown-digit");
 
         // Set initial values
-        update_countdown_digits(&minute_tens, &minute_ones, &second_tens, &second_ones, duration);
+        update_countdown_digits(
+            &minute_tens,
+            &minute_ones,
+            &second_tens,
+            &second_ones,
+            duration,
+        );
 
         timer_box.append(&minute_tens);
         timer_box.append(&minute_ones);
@@ -134,12 +152,7 @@ impl BreakWindow {
         let skip_button = Button::with_label("⏩ Skip");
         skip_button.add_css_class("break-skip-button");
 
-        // Lock screen button
-        let lock_button = Button::with_label("🔒 Lock Screen");
-        lock_button.add_css_class("break-lock-button");
-
         button_box.append(&skip_button);
-        button_box.append(&lock_button);
 
         center_box.append(&button_box);
 
@@ -187,15 +200,6 @@ impl BreakWindow {
         skip_button.connect_clicked(move |_| {
             log::info!("Break skipped by user");
             window_clone.close();
-        });
-
-        // Lock screen button handler
-        lock_button.connect_clicked(|_| {
-            log::info!("Lock screen requested");
-            // Try common Linux lock commands
-            let _ = std::process::Command::new("loginctl")
-                .arg("lock-session")
-                .spawn();
         });
 
         // Double ESC key handler
