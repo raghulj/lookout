@@ -34,6 +34,9 @@ rand = "0.8"
 log = "0.4"
 env_logger = "0.11"
 
+# Self-update functionality
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
 [dev-dependencies]
 # Testing utilities can be added here
 

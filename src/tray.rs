@@ -95,6 +95,22 @@ impl Tray for LookoutTray {
             .into(),
         );
 
+        // Check for Updates
+        items.push(
+            StandardItem {
+                label: "Check for Updates".to_string(),
+                icon_name: "system-software-update".to_string(),
+                activate: Box::new(|_this: &mut Self| {
+                    log::info!("Checking for updates from tray");
+                    gtk4::glib::MainContext::default().invoke(|| {
+                        check_for_updates_from_tray();
+                    });
+                }),
+                ..Default::default()
+            }
+            .into(),
+        );
+
         items.push(MenuItem::Separator);
 
         // About
@@ -218,6 +234,165 @@ fn show_about_dialog() {
 
     // Add designers
     dialog.set_artists(&["Claude Code (AI)"]);
+
+    dialog.present();
+}
+
+/// Check for updates from tray menu
+fn check_for_updates_from_tray() {
+    use crate::updater;
+    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
+
+    if !updater::can_self_update() {
+        let dialog = MessageDialog::new(
+            None::<&gtk4::Window>,
+            DialogFlags::MODAL,
+            MessageType::Warning,
+            ButtonsType::Ok,
+            "Self-update is disabled because Lookout was installed via a package manager.\n\nPlease use your system's package manager to update.",
+        );
+        dialog.set_title(Some("Self-update Disabled"));
+        dialog.connect_response(move |dialog, _| {
+            dialog.close();
+        });
+        dialog.present();
+        return;
+    }
+
+    // Show checking dialog
+    let checking_dialog = MessageDialog::new(
+        None::<&gtk4::Window>,
+        DialogFlags::MODAL,
+        MessageType::Info,
+        ButtonsType::None,
+        "Please wait while we check for updates...",
+    );
+    checking_dialog.set_title(Some("Checking for Updates"));
+    checking_dialog.present();
+
+    // Check for updates in background
+    gtk4::glib::spawn_future_local(async move {
+        let result = updater::check_for_updates().await;
+
+        checking_dialog.close();
+
+        match result {
+            Ok(Some(new_version)) => {
+                show_tray_update_dialog(&new_version);
+            },
+            Ok(None) => {
+                let dialog = MessageDialog::new(
+                    None::<&gtk4::Window>,
+                    DialogFlags::MODAL,
+                    MessageType::Info,
+                    ButtonsType::Ok,
+                    &format!(
+                        "You're already running the latest version (v{})!",
+                        env!("CARGO_PKG_VERSION")
+                    ),
+                );
+                dialog.set_title(Some("Up to Date"));
+                dialog.connect_response(move |dialog, _| {
+                    dialog.close();
+                });
+                dialog.present();
+            },
+            Err(e) => {
+                let dialog = MessageDialog::new(
+                    None::<&gtk4::Window>,
+                    DialogFlags::MODAL,
+                    MessageType::Error,
+                    ButtonsType::Ok,
+                    &e.to_string(),
+                );
+                dialog.set_title(Some("Update Check Failed"));
+                dialog.connect_response(move |dialog, _| {
+                    dialog.close();
+                });
+                dialog.present();
+                log::error!("Update check failed: {}", e);
+            },
+        }
+    });
+}
+
+/// Show update dialog from tray
+fn show_tray_update_dialog(new_version: &str) {
+    use crate::updater;
+    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType, ResponseType};
+
+    let message = format!(
+        "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nWould you like to install it now?",
+        env!("CARGO_PKG_VERSION"),
+        new_version
+    );
+
+    let dialog = MessageDialog::new(
+        None::<&gtk4::Window>,
+        DialogFlags::MODAL,
+        MessageType::Question,
+        ButtonsType::YesNo,
+        &message,
+    );
+
+    dialog.set_title(Some("Update Available"));
+
+    let new_version = new_version.to_string();
+    dialog.connect_response(move |dialog, response| {
+        if response == ResponseType::Yes {
+            let progress_dialog = MessageDialog::new(
+                None::<&gtk4::Window>,
+                DialogFlags::MODAL,
+                MessageType::Info,
+                ButtonsType::None,
+                &format!("Downloading and installing version {}...", new_version),
+            );
+            progress_dialog.set_title(Some("Installing Update"));
+            progress_dialog.present();
+
+            gtk4::glib::spawn_future_local(async move {
+                let result = updater::perform_update().await;
+
+                match result {
+                    Ok(_version) => {
+                        progress_dialog.close();
+
+                        let success_dialog = MessageDialog::new(
+                            None::<&gtk4::Window>,
+                            DialogFlags::MODAL,
+                            MessageType::Info,
+                            ButtonsType::Ok,
+                            "Update installed successfully! Restarting Lookout...",
+                        );
+                        success_dialog.set_title(Some("Update Successful"));
+                        success_dialog.present();
+
+                        gtk4::glib::timeout_add_seconds_local_once(2, || {
+                            if let Err(e) = updater::restart_application() {
+                                log::error!("Failed to restart: {}", e);
+                            }
+                        });
+                    },
+                    Err(e) => {
+                        progress_dialog.close();
+                        let error_dialog = MessageDialog::new(
+                            None::<&gtk4::Window>,
+                            DialogFlags::MODAL,
+                            MessageType::Error,
+                            ButtonsType::Ok,
+                            &format!("Failed to install update: {}", e),
+                        );
+                        error_dialog.set_title(Some("Update Failed"));
+                        error_dialog.connect_response(move |dialog, _| {
+                            dialog.close();
+                        });
+                        error_dialog.present();
+                    },
+                }
+            });
+        }
+        dialog.close();
+    });
 
     dialog.present();
 }

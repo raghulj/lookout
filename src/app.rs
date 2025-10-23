@@ -2,7 +2,7 @@
 
 use crate::{
     autostart::AutostartManager, break_window::BreakWindow, settings::Settings, timer::TimerEngine,
-    tray::TrayService,
+    tray::TrayService, updater,
 };
 use gtk4::prelude::*;
 use gtk4::{glib, Application};
@@ -58,7 +58,41 @@ impl LookoutApp {
                 log::warn!("Failed to sync autostart setting on startup: {e}");
             }
 
+            // Check for updates on startup if enabled
+            if config.auto_update_check && updater::can_self_update() {
+                log::info!("Checking for updates on startup");
+                tokio::spawn(async {
+                    match updater::check_for_updates().await {
+                        Ok(Some(new_version)) => {
+                            log::info!("Update available: v{}", new_version);
+                            // Show notification via GTK on main thread using invoke
+                            glib::MainContext::default().invoke(move || {
+                                glib::spawn_future_local(async move {
+                                    show_update_notification(&new_version);
+                                });
+                            });
+                        }
+                        Ok(None) => {
+                            log::info!("Already on latest version");
+                        }
+                        Err(e) => {
+                            log::warn!("Update check failed: {}", e);
+                        }
+                    }
+                });
+            }
+
             let timer = Arc::new(TimerEngine::new(config.clone()));
+
+            // Subscribe to config updates and update timer when settings change
+            let mut config_receiver = settings.subscribe();
+            let timer_for_config = Arc::clone(&timer);
+            tokio::spawn(async move {
+                while let Ok(new_config) = config_receiver.recv().await {
+                    log::info!("Config updated, resetting timer");
+                    timer_for_config.update_config(new_config).await;
+                }
+            });
 
             // Subscribe to break events
             let mut event_receiver = timer.subscribe();
@@ -124,14 +158,12 @@ impl LookoutApp {
                     let micro_time = timer_clone.time_until_micro_break().await;
                     let long_time = timer_clone.time_until_long_break().await;
 
-                    // Format tooltip text
-                    let micro_mins = micro_time.as_secs() / 60;
-                    let micro_secs = micro_time.as_secs() % 60;
-                    let long_mins = long_time.as_secs() / 60;
-                    let long_secs = long_time.as_secs() % 60;
+                    // Format tooltip text (round up to next minute)
+                    let micro_mins = (micro_time.as_secs() + 59) / 60; // Round up
+                    let long_mins = (long_time.as_secs() + 59) / 60; // Round up
 
                     let tooltip = format!(
-                        "Lookout - Break Reminder\n\nNext short reminder: {micro_mins}m {micro_secs}s\nNext long reminder: {long_mins}m {long_secs}s"
+                        "Lookout - Break Reminder\n\nNext short reminder: {micro_mins}m\nNext long reminder: {long_mins}m"
                     );
 
                     tray_update.update_tooltip(&tooltip);
@@ -160,4 +192,28 @@ impl Default for LookoutApp {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Show update notification when new version is available
+fn show_update_notification(new_version: &str) {
+    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
+
+    let dialog = MessageDialog::new(
+        None::<&gtk4::Window>,
+        DialogFlags::MODAL,
+        MessageType::Info,
+        ButtonsType::Ok,
+        &format!(
+            "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nYou can install it from the Settings window.",
+            env!("CARGO_PKG_VERSION"),
+            new_version
+        ),
+    );
+
+    dialog.set_title(Some("Update Available"));
+    dialog.connect_response(move |dialog, _| {
+        dialog.close();
+    });
+
+    dialog.present();
 }

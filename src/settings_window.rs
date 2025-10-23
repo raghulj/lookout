@@ -4,10 +4,11 @@ use crate::autostart::AutostartManager;
 use crate::break_window::BreakWindow;
 use crate::settings::Settings;
 use crate::timer::BreakType;
+use crate::updater;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box as GtkBox, Button, ColorButton, ListBox, Orientation, ScrolledWindow, SpinButton, Stack,
-    Switch,
+    Align, Box as GtkBox, Button, ColorButton, Label, ListBox, Orientation, ScrolledWindow,
+    SpinButton, Spinner, Stack, Switch,
 };
 use libadwaita as adw;
 use libadwaita::prelude::*;
@@ -204,6 +205,111 @@ impl SettingsWindow {
 
         prefs_page.add(&general_group);
 
+        // Updates group
+        let updates_group = adw::PreferencesGroup::new();
+        updates_group.set_title("Updates");
+        updates_group.set_margin_bottom(24);
+
+        // Auto-update check setting
+        let auto_update_row = adw::ActionRow::new();
+        auto_update_row.set_title("Check for Updates Automatically");
+        auto_update_row.set_subtitle("Check for new versions when Lookout starts");
+        let auto_update_switch = Switch::new();
+        auto_update_switch.set_active(config.auto_update_check);
+        auto_update_switch.set_valign(Align::Center);
+        auto_update_row.add_suffix(&auto_update_switch);
+        auto_update_row.set_activatable_widget(Some(&auto_update_switch));
+        updates_group.add(&auto_update_row);
+
+        // Check for updates button
+        let check_updates_row = adw::ActionRow::new();
+        check_updates_row.set_title("Check for Updates");
+
+        let current_version = env!("CARGO_PKG_VERSION");
+        check_updates_row.set_subtitle(&format!("Current version: {}", current_version));
+
+        let check_button_box = GtkBox::new(Orientation::Horizontal, 6);
+        check_button_box.set_valign(Align::Center);
+
+        let check_button = Button::with_label("Check Now");
+        let spinner = Spinner::new();
+        spinner.set_visible(false);
+        let status_label = Label::new(None);
+        status_label.set_visible(false);
+
+        check_button_box.append(&check_button);
+        check_button_box.append(&spinner);
+        check_button_box.append(&status_label);
+
+        let spinner_clone = spinner.clone();
+        let status_label_clone = status_label.clone();
+        let check_button_clone = check_button.clone();
+
+        check_button.connect_clicked(move |_| {
+            let spinner = spinner_clone.clone();
+            let status_label = status_label_clone.clone();
+            let check_button = check_button_clone.clone();
+
+            // Show spinner
+            spinner.set_visible(true);
+            spinner.start();
+            status_label.set_visible(false);
+            check_button.set_sensitive(false);
+
+            // Check for updates in background
+            let spinner = spinner.clone();
+            let status_label = status_label.clone();
+            let check_button = check_button.clone();
+
+            gtk4::glib::spawn_future_local(async move {
+                let result = if !updater::can_self_update() {
+                    Err("Self-update disabled (installed via package manager)".to_string())
+                } else {
+                    updater::check_for_updates().await.map_err(|e| e.to_string())
+                };
+
+                spinner.stop();
+                spinner.set_visible(false);
+                check_button.set_sensitive(true);
+                status_label.set_visible(true);
+
+                match result {
+                    Ok(Some(new_version)) => {
+                        status_label.set_text(&format!("Update available: v{}", new_version));
+                        status_label.add_css_class("success");
+
+                        // Show update dialog
+                        show_update_dialog(&new_version);
+                    },
+                    Ok(None) => {
+                        status_label.set_text("You're up to date!");
+                        status_label.add_css_class("success");
+                    },
+                    Err(e) => {
+                        status_label.set_text(&e);
+                        status_label.add_css_class("error");
+                        log::error!("Update check failed: {}", e);
+                    },
+                }
+            });
+        });
+
+        check_updates_row.add_suffix(&check_button_box);
+        updates_group.add(&check_updates_row);
+
+        // Warning if can't self-update
+        if !updater::can_self_update() {
+            let warning_row = adw::ActionRow::new();
+            warning_row.set_title("Self-update disabled");
+            warning_row.set_subtitle(
+                "Installed via package manager. Use your system's package manager to update.",
+            );
+            warning_row.add_css_class("warning");
+            updates_group.add(&warning_row);
+        }
+
+        prefs_page.add(&updates_group);
+
         // Save button in its own group
         let button_group = adw::PreferencesGroup::new();
         button_group.set_margin_top(12);
@@ -223,6 +329,7 @@ impl SettingsWindow {
             if let Err(e) = settings_clone.update(|cfg| {
                 cfg.enabled = enabled_switch.is_active();
                 cfg.auto_start = new_auto_start;
+                cfg.auto_update_check = auto_update_switch.is_active();
             }) {
                 log::error!("Failed to save general settings: {e}");
             } else {
@@ -482,10 +589,30 @@ impl SettingsWindow {
         presets_group.set_margin_bottom(24);
 
         let presets = vec![
-            ("Default Dark", "rgba(0, 0, 0, 0.95)", "rgba(255, 255, 255, 1.0)", "Black background with white text"),
-            ("Pure Black", "rgba(0, 0, 0, 1.0)", "rgba(255, 255, 255, 1.0)", "Solid black with white text"),
-            ("Navy Blue", "rgba(15, 23, 42, 0.95)", "rgba(226, 232, 240, 1.0)", "Dark blue with light gray text"),
-            ("Deep Purple", "rgba(30, 20, 60, 0.95)", "rgba(243, 232, 255, 1.0)", "Purple background with lavender text"),
+            (
+                "Default Dark",
+                "rgba(0, 0, 0, 0.95)",
+                "rgba(255, 255, 255, 1.0)",
+                "Black background with white text",
+            ),
+            (
+                "Pure Black",
+                "rgba(0, 0, 0, 1.0)",
+                "rgba(255, 255, 255, 1.0)",
+                "Solid black with white text",
+            ),
+            (
+                "Navy Blue",
+                "rgba(15, 23, 42, 0.95)",
+                "rgba(226, 232, 240, 1.0)",
+                "Dark blue with light gray text",
+            ),
+            (
+                "Deep Purple",
+                "rgba(30, 20, 60, 0.95)",
+                "rgba(243, 232, 255, 1.0)",
+                "Purple background with lavender text",
+            ),
         ];
 
         for (name, bg_color, text_color, description) in presets {
@@ -656,7 +783,10 @@ impl SettingsWindow {
 /// Parse CSS rgba color string to GTK RGBA
 fn parse_color_string(color_str: &str) -> Option<gtk4::gdk::RGBA> {
     // Try to parse rgba(r, g, b, a) format
-    if let Some(inner) = color_str.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = color_str
+        .strip_prefix("rgba(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
         if parts.len() == 4 {
             if let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
@@ -684,4 +814,120 @@ fn rgba_to_string(rgba: &gtk4::gdk::RGBA) -> String {
     let b = (rgba.blue() * 255.0).round() as u8;
     let a = rgba.alpha();
     format!("rgba({}, {}, {}, {})", r, g, b, a)
+}
+
+/// Show update available dialog with option to install
+fn show_update_dialog(new_version: &str) {
+    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType, ResponseType};
+
+    let message = format!(
+        "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nWould you like to install it now?",
+        env!("CARGO_PKG_VERSION"),
+        new_version
+    );
+
+    let dialog = MessageDialog::new(
+        None::<&gtk4::Window>,
+        DialogFlags::MODAL,
+        MessageType::Question,
+        ButtonsType::YesNo,
+        &message,
+    );
+
+    dialog.set_title(Some("Update Available"));
+
+    let new_version = new_version.to_string();
+    dialog.connect_response(move |dialog, response| {
+        if response == ResponseType::Yes {
+            perform_update_with_progress(&new_version);
+        }
+        dialog.close();
+    });
+
+    dialog.present();
+}
+
+/// Perform update with progress indication
+fn perform_update_with_progress(new_version: &str) {
+    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
+
+    let progress_dialog = MessageDialog::new(
+        None::<&gtk4::Window>,
+        DialogFlags::MODAL,
+        MessageType::Info,
+        ButtonsType::None,
+        &format!(
+            "Downloading and installing version {}...\n\nThis may take a moment.",
+            new_version
+        ),
+    );
+
+    progress_dialog.set_title(Some("Installing Update"));
+
+    let spinner_box = GtkBox::new(Orientation::Horizontal, 12);
+    spinner_box.set_halign(Align::Center);
+    spinner_box.set_margin_top(12);
+    spinner_box.set_margin_bottom(12);
+
+    let spinner = Spinner::new();
+    spinner.start();
+    let status_label = Label::new(Some("Downloading..."));
+
+    spinner_box.append(&spinner);
+    spinner_box.append(&status_label);
+
+    // For GTK4 MessageDialog, we can't set extra child, so we'll just use the message
+    progress_dialog.present();
+
+    // Perform update in background
+    let status_label_clone = status_label.clone();
+    let progress_dialog_clone = progress_dialog.clone();
+
+    gtk4::glib::spawn_future_local(async move {
+        let result = updater::perform_update().await;
+
+        match result {
+            Ok(version) => {
+                status_label_clone.set_text("Update successful! Restarting...");
+
+                // Wait a moment for user to see the message
+                gtk4::glib::timeout_add_seconds_local_once(2, move || {
+                    log::info!("Update completed to version {}. Restarting...", version);
+
+                    // Restart the application
+                    if let Err(e) = updater::restart_application() {
+                        log::error!("Failed to restart application: {}", e);
+                        show_error_dialog(
+                            "Failed to restart application. Please restart manually.",
+                        );
+                    }
+                });
+            },
+            Err(e) => {
+                progress_dialog_clone.close();
+                show_error_dialog(&format!("Update failed: {}", e));
+                log::error!("Update failed: {}", e);
+            },
+        }
+    });
+}
+
+/// Show error dialog
+fn show_error_dialog(message: &str) {
+    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
+
+    let dialog = MessageDialog::new(
+        None::<&gtk4::Window>,
+        DialogFlags::MODAL,
+        MessageType::Error,
+        ButtonsType::Ok,
+        message,
+    );
+
+    dialog.set_title(Some("Update Error"));
+    dialog.connect_response(move |dialog, _| {
+        dialog.close();
+    });
+
+    dialog.present();
 }

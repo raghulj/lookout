@@ -94,6 +94,13 @@ pub struct Config {
     /// Break messages
     #[serde(default)]
     pub break_messages: BreakMessages,
+    /// Automatically check for updates on startup
+    #[serde(default = "default_auto_update_check")]
+    pub auto_update_check: bool,
+}
+
+fn default_auto_update_check() -> bool {
+    true
 }
 
 fn default_background_color() -> String {
@@ -116,6 +123,7 @@ impl Default for Config {
             background_color: default_background_color(),
             text_color: default_text_color(),
             break_messages: BreakMessages::default(),
+            auto_update_check: default_auto_update_check(),
         }
     }
 }

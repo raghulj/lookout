@@ -2,11 +2,13 @@
 
 use crate::config::Config;
 use std::sync::{Arc, RwLock};
+use tokio::sync::broadcast;
 
 /// Thread-safe settings manager
 #[derive(Clone)]
 pub struct Settings {
     config: Arc<RwLock<Config>>,
+    update_sender: broadcast::Sender<Config>,
 }
 
 impl Settings {
@@ -17,8 +19,11 @@ impl Settings {
             Config::default()
         });
 
+        let (update_sender, _) = broadcast::channel(16);
+
         Self {
             config: Arc::new(RwLock::new(config)),
+            update_sender,
         }
     }
 
@@ -35,7 +40,7 @@ impl Settings {
     where
         F: FnOnce(&mut Config),
     {
-        {
+        let updated_config = {
             let mut config = self
                 .config
                 .write()
@@ -46,10 +51,20 @@ impl Settings {
             config
                 .save()
                 .map_err(|e| format!("Failed to save config: {e}"))?;
-        }
+
+            config.clone()
+        };
+
+        // Notify subscribers of config change
+        let _ = self.update_sender.send(updated_config);
 
         log::info!("Settings updated successfully");
         Ok(())
+    }
+
+    /// Subscribe to configuration updates
+    pub fn subscribe(&self) -> broadcast::Receiver<Config> {
+        self.update_sender.subscribe()
     }
 }
 

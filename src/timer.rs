@@ -30,7 +30,7 @@ pub enum BreakEvent {
 
 /// Break timer engine
 pub struct TimerEngine {
-    config: Config,
+    config: Arc<RwLock<Config>>,
     state: Arc<RwLock<TimerState>>,
     next_micro_break: Arc<RwLock<Instant>>,
     next_long_break: Arc<RwLock<Instant>>,
@@ -48,7 +48,7 @@ impl TimerEngine {
         let long_interval = Duration::from_secs(u64::from(config.long_break_interval_minutes) * 60);
 
         Self {
-            config,
+            config: Arc::new(RwLock::new(config)),
             state: Arc::new(RwLock::new(TimerState::Running)),
             next_micro_break: Arc::new(RwLock::new(now + micro_interval)),
             next_long_break: Arc::new(RwLock::new(now + long_interval)),
@@ -97,14 +97,14 @@ impl TimerEngine {
 
     /// Trigger a break
     pub async fn trigger_break(&self, break_type: BreakType) {
+        let config = self.config.read().await;
         let duration = match break_type {
-            BreakType::Micro => {
-                Duration::from_secs(u64::from(self.config.micro_break_duration_seconds))
-            },
+            BreakType::Micro => Duration::from_secs(u64::from(config.micro_break_duration_seconds)),
             BreakType::Long => {
-                Duration::from_secs(u64::from(self.config.long_break_duration_minutes) * 60)
+                Duration::from_secs(u64::from(config.long_break_duration_minutes) * 60)
             },
         };
+        drop(config);
 
         // Update state
         {
@@ -138,17 +138,18 @@ impl TimerEngine {
     /// Schedule the next break of the given type
     async fn schedule_next_break(&self, break_type: BreakType) {
         let now = Instant::now();
+        let config = self.config.read().await;
 
         match break_type {
             BreakType::Micro => {
                 let interval =
-                    Duration::from_secs(u64::from(self.config.micro_break_interval_minutes) * 60);
+                    Duration::from_secs(u64::from(config.micro_break_interval_minutes) * 60);
                 *self.next_micro_break.write().await = now + interval;
                 log::debug!("Next micro break scheduled in {interval:?}");
             },
             BreakType::Long => {
                 let interval =
-                    Duration::from_secs(u64::from(self.config.long_break_interval_minutes) * 60);
+                    Duration::from_secs(u64::from(config.long_break_interval_minutes) * 60);
                 *self.next_long_break.write().await = now + interval;
                 log::debug!("Next long break scheduled in {interval:?}");
             },
@@ -187,6 +188,30 @@ impl TimerEngine {
     pub async fn time_until_long_break(&self) -> Duration {
         let next = *self.next_long_break.read().await;
         next.saturating_duration_since(Instant::now())
+    }
+
+    /// Update configuration and reset timers
+    pub async fn update_config(&self, new_config: Config) {
+        log::info!("Updating timer configuration");
+
+        // Update the config
+        *self.config.write().await = new_config.clone();
+
+        // Reset timers with new intervals
+        let now = Instant::now();
+        let micro_interval =
+            Duration::from_secs(u64::from(new_config.micro_break_interval_minutes) * 60);
+        let long_interval =
+            Duration::from_secs(u64::from(new_config.long_break_interval_minutes) * 60);
+
+        *self.next_micro_break.write().await = now + micro_interval;
+        *self.next_long_break.write().await = now + long_interval;
+
+        log::info!(
+            "Timers reset - next micro break in {:?}, next long break in {:?}",
+            micro_interval,
+            long_interval
+        );
     }
 }
 

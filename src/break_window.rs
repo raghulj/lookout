@@ -82,7 +82,11 @@ impl BreakWindow {
         // Main heading - random selection
         let heading = self.config.break_messages.random_heading();
         let heading_label = Label::new(Some(heading));
-        heading_label.set_markup(&format!("<span size='56000' weight='bold' foreground='{}'>{}</span>", text_color, glib::markup_escape_text(heading)));
+        heading_label.set_markup(&format!(
+            "<span size='56000' weight='bold' foreground='{}'>{}</span>",
+            text_color,
+            glib::markup_escape_text(heading)
+        ));
         center_box.append(&heading_label);
 
         // Instruction message - random selection based on break type
@@ -92,7 +96,11 @@ impl BreakWindow {
         };
 
         let instruction_label = Label::new(Some(instruction));
-        instruction_label.set_markup(&format!("<span size='20000' foreground='{}'>{}</span>", text_color, glib::markup_escape_text(instruction)));
+        instruction_label.set_markup(&format!(
+            "<span size='20000' foreground='{}'>{}</span>",
+            text_color,
+            glib::markup_escape_text(instruction)
+        ));
         instruction_label.set_wrap(true);
         instruction_label.set_max_width_chars(60);
         instruction_label.set_justify(gtk4::Justification::Center);
@@ -123,7 +131,10 @@ impl BreakWindow {
         );
 
         // Set colon color
-        colon_label.set_markup(&format!("<span size='120000' foreground='{}'>:</span>", text_color));
+        colon_label.set_markup(&format!(
+            "<span size='120000' foreground='{}'>:</span>",
+            text_color
+        ));
 
         timer_box.append(&minute_tens);
         timer_box.append(&minute_ones);
@@ -150,7 +161,10 @@ impl BreakWindow {
         let hint_label = Label::new(Some("Press Esc twice to skip"));
         // Create a dimmed version of the text color for hints
         let hint_color = dim_rgba_color(&self.config.text_color, 0.6);
-        hint_label.set_markup(&format!("<span size='14000' foreground='{}'>Press Esc twice to skip</span>", hint_color));
+        hint_label.set_markup(&format!(
+            "<span size='14000' foreground='{}'>Press Esc twice to skip</span>",
+            hint_color
+        ));
         hint_label.set_margin_bottom(32);
         hint_label.set_margin_top(24);
         center_box.append(&hint_label);
@@ -266,7 +280,11 @@ fn update_current_time(label: &Label, text_color: &str) {
     let now = SystemTime::now();
     let datetime = chrono::DateTime::<chrono::Local>::from(now);
     let time_str = datetime.format("Current time is %H:%M").to_string();
-    label.set_markup(&format!("<span size='16000' weight='500' foreground='{}'>{}</span>", text_color, glib::markup_escape_text(&time_str)));
+    label.set_markup(&format!(
+        "<span size='16000' weight='500' foreground='{}'>{}</span>",
+        text_color,
+        glib::markup_escape_text(&time_str)
+    ));
 }
 
 /// Update countdown digit labels
@@ -287,10 +305,22 @@ fn update_countdown_digits(
     let sec_tens = seconds / 10;
     let sec_ones = seconds % 10;
 
-    minute_tens.set_markup(&format!("<span size='120000' foreground='{}'>{}</span>", text_color, min_tens));
-    minute_ones.set_markup(&format!("<span size='120000' foreground='{}'>{}</span>", text_color, min_ones));
-    second_tens.set_markup(&format!("<span size='120000' foreground='{}'>{}</span>", text_color, sec_tens));
-    second_ones.set_markup(&format!("<span size='120000' foreground='{}'>{}</span>", text_color, sec_ones));
+    minute_tens.set_markup(&format!(
+        "<span size='120000' foreground='{}'>{}</span>",
+        text_color, min_tens
+    ));
+    minute_ones.set_markup(&format!(
+        "<span size='120000' foreground='{}'>{}</span>",
+        text_color, min_ones
+    ));
+    second_tens.set_markup(&format!(
+        "<span size='120000' foreground='{}'>{}</span>",
+        text_color, sec_tens
+    ));
+    second_ones.set_markup(&format!(
+        "<span size='120000' foreground='{}'>{}</span>",
+        text_color, sec_ones
+    ));
 }
 
 /// Parse RGBA color string to tuple (r, g, b, a) for Cairo
@@ -299,7 +329,10 @@ fn parse_rgba(color_str: &str) -> (f64, f64, f64, f64) {
     let default = (0.0, 0.0, 0.0, 0.95);
 
     // Try to parse rgba(r, g, b, a) format
-    if let Some(inner) = color_str.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = color_str
+        .strip_prefix("rgba(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
         if parts.len() == 4 {
             if let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
@@ -320,7 +353,10 @@ fn parse_rgba(color_str: &str) -> (f64, f64, f64, f64) {
 /// Pango markup accepts #RRGGBB hex format, not rgba()
 fn rgba_to_pango_color(color_str: &str) -> String {
     // Try to parse rgba(r, g, b, a) format
-    if let Some(inner) = color_str.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = color_str
+        .strip_prefix("rgba(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
         if parts.len() == 4 {
             if let (Ok(r), Ok(g), Ok(b), Ok(_a)) = (
@@ -343,7 +379,10 @@ fn rgba_to_pango_color(color_str: &str) -> String {
 /// For Pango, we blend the color with the background for a dimming effect
 fn dim_rgba_color(color_str: &str, dim_factor: f64) -> String {
     // Try to parse rgba(r, g, b, a) format
-    if let Some(inner) = color_str.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = color_str
+        .strip_prefix("rgba(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
         if parts.len() == 4 {
             if let (Ok(r), Ok(g), Ok(b), Ok(_a)) = (

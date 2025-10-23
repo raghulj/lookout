@@ -6,6 +6,7 @@ mod settings;
 mod settings_window;
 mod timer;
 mod tray;
+mod updater;
 
 use std::env;
 use std::error::Error;
@@ -106,22 +107,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
             "--version" | "-v" => {
                 show_version();
                 return Ok(());
-            }
+            },
             "--help" | "-h" => {
                 show_help();
                 return Ok(());
-            }
+            },
             "--enable-autostart" => {
                 return enable_autostart();
-            }
+            },
             "--disable-autostart" => {
                 return disable_autostart();
-            }
+            },
             _ => {
                 eprintln!("Unknown option: {}", args[1]);
                 eprintln!("Run 'lookout --help' for usage information");
                 return Err("Unknown option".into());
-            }
+            },
         }
     }
 
