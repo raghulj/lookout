@@ -149,7 +149,7 @@ DESKTOP_FILE="$DESKTOP_DIR/lookout.desktop"
 cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=Lookout
-Comment=AI-Powered Break Reminder for Linux
+Comment=Break Reminder for Linux
 Exec=$INSTALL_DIR/lookout
 Icon=preferences-desktop-display
 Terminal=false

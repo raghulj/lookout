@@ -67,13 +67,13 @@ fn disable_autostart() -> Result<(), Box<dyn Error>> {
 
 fn show_version() {
     println!("Lookout v{}", VERSION);
-    println!("AI-Powered Break Reminder for Linux");
+    println!("Break Reminder for Linux");
     println!();
     println!("Repository: {}", REPO_URL);
 }
 
 fn show_help() {
-    println!("Lookout v{} - AI-Powered Break Reminder for Linux", VERSION);
+    println!("Lookout v{} - Break Reminder for Linux", VERSION);
     println!();
     println!("USAGE:");
     println!("    lookout [OPTIONS]");
