@@ -24,6 +24,12 @@ serde_json = "1.0"
 # System paths
 dirs = "5.0"
 
+# Time formatting
+chrono = "0.4"
+
+# Random selection
+rand = "0.8"
+
 # Logging (optional but recommended)
 log = "0.4"
 env_logger = "0.11"

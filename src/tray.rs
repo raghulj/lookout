@@ -1,14 +1,17 @@
 //! System tray integration using ksni
 
 use crate::settings::Settings;
+use crate::timer::BreakType;
 use gtk4::prelude::*;
 use ksni::{menu, Tray, TrayService as KsniTrayService};
 use std::sync::{Arc, RwLock};
+use tokio::sync::mpsc;
 
 /// Tray icon status
 struct LookoutTray {
     settings: Settings,
     tooltip: Arc<RwLock<String>>,
+    test_break_tx: mpsc::UnboundedSender<BreakType>,
 }
 
 impl Tray for LookoutTray {
@@ -26,10 +29,7 @@ impl Tray for LookoutTray {
         let tooltip_text = self
             .tooltip
             .read()
-            .map_or_else(
-                |_| "Lookout".to_string(),
-                |t| t.clone(),
-            );
+            .map_or_else(|_| "Lookout".to_string(), |t| t.clone());
 
         ksni::ToolTip {
             title: "Lookout".to_string(),
@@ -42,7 +42,42 @@ impl Tray for LookoutTray {
     fn menu(&self) -> Vec<menu::MenuItem<Self>> {
         use menu::{MenuItem, StandardItem};
 
-        vec![
+        let mut items = vec![];
+
+        // Add test break items only in debug builds
+        #[cfg(debug_assertions)]
+        {
+            items.push(
+                StandardItem {
+                    label: "Test Micro Break (20s)".to_string(),
+                    icon_name: "media-playback-start".to_string(),
+                    activate: Box::new(|this: &mut Self| {
+                        log::info!("Testing micro break from tray");
+                        let _ = this.test_break_tx.send(BreakType::Micro);
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            );
+
+            items.push(
+                StandardItem {
+                    label: "Test Long Break (5m)".to_string(),
+                    icon_name: "media-playback-start".to_string(),
+                    activate: Box::new(|this: &mut Self| {
+                        log::info!("Testing long break from tray");
+                        let _ = this.test_break_tx.send(BreakType::Long);
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            );
+
+            items.push(MenuItem::Separator);
+        }
+
+        // Settings
+        items.push(
             StandardItem {
                 label: "Settings".to_string(),
                 icon_name: "preferences-system".to_string(),
@@ -57,7 +92,12 @@ impl Tray for LookoutTray {
                 ..Default::default()
             }
             .into(),
-            MenuItem::Separator,
+        );
+
+        items.push(MenuItem::Separator);
+
+        // About
+        items.push(
             StandardItem {
                 label: "About".to_string(),
                 icon_name: "help-about".to_string(),
@@ -70,7 +110,12 @@ impl Tray for LookoutTray {
                 ..Default::default()
             }
             .into(),
-            MenuItem::Separator,
+        );
+
+        items.push(MenuItem::Separator);
+
+        // Quit
+        items.push(
             StandardItem {
                 label: "Quit".to_string(),
                 icon_name: "application-exit".to_string(),
@@ -81,7 +126,9 @@ impl Tray for LookoutTray {
                 ..Default::default()
             }
             .into(),
-        ]
+        );
+
+        items
     }
 }
 
@@ -89,17 +136,23 @@ impl Tray for LookoutTray {
 pub struct TrayService {
     settings: Settings,
     tooltip: Arc<RwLock<String>>,
+    test_break_tx: mpsc::UnboundedSender<BreakType>,
     handle: Option<ksni::Handle<LookoutTray>>,
 }
 
 impl TrayService {
     /// Create a new tray service
-    pub fn new(settings: Settings) -> Self {
-        Self {
+    pub fn new(settings: Settings) -> (Self, mpsc::UnboundedReceiver<BreakType>) {
+        let (test_break_tx, test_break_rx) = mpsc::unbounded_channel();
+
+        let service = Self {
             settings,
             tooltip: Arc::new(RwLock::new("Next break in...".to_string())),
+            test_break_tx,
             handle: None,
-        }
+        };
+
+        (service, test_break_rx)
     }
 
     /// Initialize and show the tray icon
@@ -109,6 +162,7 @@ impl TrayService {
         let tray = LookoutTray {
             settings: self.settings.clone(),
             tooltip: Arc::clone(&self.tooltip),
+            test_break_tx: self.test_break_tx.clone(),
         };
 
         // Spawn the tray service and keep the handle alive

@@ -5,6 +5,71 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
+/// Break message collections
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BreakMessages {
+    /// Main heading messages shown during breaks
+    pub headings: Vec<String>,
+    /// Instructions for micro breaks
+    pub micro_break_instructions: Vec<String>,
+    /// Instructions for long breaks
+    pub long_break_instructions: Vec<String>,
+}
+
+impl Default for BreakMessages {
+    fn default() -> Self {
+        Self {
+            headings: vec![
+                "Take a moment".to_string(),
+                "Time for a break".to_string(),
+                "Pause and breathe".to_string(),
+                "Step away".to_string(),
+                "Rest your eyes".to_string(),
+            ],
+            micro_break_instructions: vec![
+                "Look at something 20 feet away to reduce eye strain".to_string(),
+                "Focus on a distant object and blink slowly".to_string(),
+                "Give your eyes a break from the screen".to_string(),
+                "Look out the window or across the room".to_string(),
+                "Gaze at something far away and relax your eyes".to_string(),
+            ],
+            long_break_instructions: vec![
+                "Stand up, walk around, and give your body a stretch".to_string(),
+                "Time to move! Stretch, walk, or grab some water".to_string(),
+                "Step away from your desk and move your body".to_string(),
+                "Take a walk, stretch your muscles, rest your mind".to_string(),
+                "Get up and move around to refresh yourself".to_string(),
+            ],
+        }
+    }
+}
+
+impl BreakMessages {
+    /// Get a random heading message
+    pub fn random_heading(&self) -> &str {
+        use rand::seq::SliceRandom;
+        self.headings
+            .choose(&mut rand::thread_rng())
+            .map_or("Take a moment", |s| s.as_str())
+    }
+
+    /// Get a random micro break instruction
+    pub fn random_micro_instruction(&self) -> &str {
+        use rand::seq::SliceRandom;
+        self.micro_break_instructions
+            .choose(&mut rand::thread_rng())
+            .map_or("Look at something distant", |s| s.as_str())
+    }
+
+    /// Get a random long break instruction
+    pub fn random_long_instruction(&self) -> &str {
+        use rand::seq::SliceRandom;
+        self.long_break_instructions
+            .choose(&mut rand::thread_rng())
+            .map_or("Stand up and stretch", |s| s.as_str())
+    }
+}
+
 /// Application configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -20,6 +85,16 @@ pub struct Config {
     pub auto_start: bool,
     /// Whether breaks are enabled
     pub enabled: bool,
+    /// Background color for break window (CSS rgba format)
+    #[serde(default = "default_background_color")]
+    pub background_color: String,
+    /// Break messages
+    #[serde(default)]
+    pub break_messages: BreakMessages,
+}
+
+fn default_background_color() -> String {
+    "rgba(0, 0, 0, 0.95)".to_string()
 }
 
 impl Default for Config {
@@ -31,6 +106,8 @@ impl Default for Config {
             long_break_duration_minutes: 5,
             auto_start: true,
             enabled: true,
+            background_color: default_background_color(),
+            break_messages: BreakMessages::default(),
         }
     }
 }

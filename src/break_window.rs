@@ -1,5 +1,6 @@
 //! Break overlay window using GTK4
 
+use crate::config::Config;
 use crate::timer::BreakType;
 use gtk4::prelude::*;
 use gtk4::{Align, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
@@ -10,17 +11,20 @@ use std::time::Duration;
 /// Break overlay window
 pub struct BreakWindow {
     window: Rc<RefCell<Option<ApplicationWindow>>>,
+    config: Config,
 }
 
 impl BreakWindow {
     /// Create a new break window
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
             window: Rc::new(RefCell::new(None)),
+            config,
         }
     }
 
     /// Show the break overlay
+    #[allow(clippy::too_many_lines)]
     pub fn show(&self, break_type: BreakType, duration: Duration) {
         log::info!("Showing break overlay: {break_type:?} for {duration:?}");
 
@@ -35,56 +39,125 @@ impl BreakWindow {
         window.add_css_class("break-window");
 
         // Create main container
-        let main_box = GtkBox::new(Orientation::Vertical, 24);
-        main_box.set_halign(Align::Center);
-        main_box.set_valign(Align::Center);
-        main_box.set_margin_top(48);
-        main_box.set_margin_bottom(48);
+        let main_box = GtkBox::new(Orientation::Vertical, 0);
+        main_box.set_halign(Align::Fill);
+        main_box.set_valign(Align::Fill);
 
-        // Break type message
-        let break_message = match break_type {
-            BreakType::Micro => "Time for a Micro Break",
-            BreakType::Long => "Time for a Long Break",
-        };
+        // Top bar with current time
+        let top_box = GtkBox::new(Orientation::Horizontal, 0);
+        top_box.set_halign(Align::Center);
+        top_box.set_margin_top(32);
 
-        let message_label = Label::new(Some(break_message));
-        message_label.add_css_class("break-message");
-        message_label.set_margin_bottom(24);
-        main_box.append(&message_label);
+        let time_label = Label::new(None);
+        time_label.add_css_class("current-time");
+        update_current_time(&time_label);
+        top_box.append(&time_label);
 
-        // Countdown label
-        let countdown_label = Label::new(Some(&format_duration(duration)));
-        countdown_label.add_css_class("break-countdown");
-        main_box.append(&countdown_label);
+        // Update time every second
+        gtk4::glib::timeout_add_seconds_local(1, move || {
+            update_current_time(&time_label);
+            gtk4::glib::ControlFlow::Continue
+        });
 
-        // Break message/instruction
+        main_box.append(&top_box);
+
+        // Center content box
+        let center_box = GtkBox::new(Orientation::Vertical, 32);
+        center_box.set_halign(Align::Center);
+        center_box.set_valign(Align::Center);
+        center_box.set_vexpand(true);
+
+        // Main heading - random selection
+        let heading = self.config.break_messages.random_heading();
+        let heading_label = Label::new(Some(heading));
+        heading_label.add_css_class("break-heading");
+        center_box.append(&heading_label);
+
+        // Instruction message - random selection based on break type
         let instruction = match break_type {
-            BreakType::Micro => "Look away from your screen and rest your eyes",
-            BreakType::Long => "Stand up, stretch, and move around",
+            BreakType::Micro => self.config.break_messages.random_micro_instruction(),
+            BreakType::Long => self.config.break_messages.random_long_instruction(),
         };
 
         let instruction_label = Label::new(Some(instruction));
-        instruction_label.set_margin_top(24);
-        instruction_label.set_margin_bottom(48);
-        main_box.append(&instruction_label);
+        instruction_label.add_css_class("break-instruction");
+        instruction_label.set_wrap(true);
+        instruction_label.set_max_width_chars(60);
+        instruction_label.set_justify(gtk4::Justification::Center);
+        center_box.append(&instruction_label);
 
-        // Skip button (enabled after minimum time)
-        let skip_button = Button::with_label("Skip Break");
+        // Countdown timer with flip animation
+        let timer_box = GtkBox::new(Orientation::Horizontal, 12);
+        timer_box.set_halign(Align::Center);
+        timer_box.add_css_class("countdown-container");
+
+        let remaining_secs = Rc::new(RefCell::new(duration.as_secs()));
+
+        // Create individual labels for MM:SS format
+        let minute_tens = Label::new(Some("0"));
+        minute_tens.add_css_class("break-countdown");
+        minute_tens.add_css_class("countdown-digit");
+
+        let minute_ones = Label::new(Some("0"));
+        minute_ones.add_css_class("break-countdown");
+        minute_ones.add_css_class("countdown-digit");
+
+        let colon_label = Label::new(Some(":"));
+        colon_label.add_css_class("break-countdown");
+        colon_label.add_css_class("countdown-separator");
+
+        let second_tens = Label::new(Some("0"));
+        second_tens.add_css_class("break-countdown");
+        second_tens.add_css_class("countdown-digit");
+
+        let second_ones = Label::new(Some("0"));
+        second_ones.add_css_class("break-countdown");
+        second_ones.add_css_class("countdown-digit");
+
+        // Set initial values
+        update_countdown_digits(&minute_tens, &minute_ones, &second_tens, &second_ones, duration);
+
+        timer_box.append(&minute_tens);
+        timer_box.append(&minute_ones);
+        timer_box.append(&colon_label);
+        timer_box.append(&second_tens);
+        timer_box.append(&second_ones);
+
+        center_box.append(&timer_box);
+
+        // Bottom buttons
+        let button_box = GtkBox::new(Orientation::Horizontal, 16);
+        button_box.set_halign(Align::Center);
+        button_box.set_margin_top(32);
+
+        // Skip button (with chevron icon)
+        let skip_button = Button::with_label("⏩ Skip");
         skip_button.add_css_class("break-skip-button");
-        skip_button.set_sensitive(false);
-        main_box.append(&skip_button);
 
-        // Enable skip button after 5 seconds
-        let skip_button_clone = skip_button.clone();
-        gtk4::glib::timeout_add_seconds_local(5, move || {
-            skip_button_clone.set_sensitive(true);
-            gtk4::glib::ControlFlow::Break
-        });
+        // Lock screen button
+        let lock_button = Button::with_label("🔒 Lock Screen");
+        lock_button.add_css_class("break-lock-button");
+
+        button_box.append(&skip_button);
+        button_box.append(&lock_button);
+
+        center_box.append(&button_box);
+
+        // Bottom hint text
+        let hint_label = Label::new(Some("Press Esc twice to skip"));
+        hint_label.add_css_class("break-hint");
+        hint_label.set_margin_bottom(32);
+        hint_label.set_margin_top(24);
+        center_box.append(&hint_label);
+
+        main_box.append(&center_box);
 
         // Update countdown every second
-        let countdown_label_weak = countdown_label.downgrade();
+        let minute_tens_weak = minute_tens.downgrade();
+        let minute_ones_weak = minute_ones.downgrade();
+        let second_tens_weak = second_tens.downgrade();
+        let second_ones_weak = second_ones.downgrade();
         let window_clone = window.clone();
-        let remaining_secs = Rc::new(RefCell::new(duration.as_secs()));
 
         gtk4::glib::timeout_add_seconds_local(1, move || {
             let mut secs = remaining_secs.borrow_mut();
@@ -94,9 +167,18 @@ impl BreakWindow {
             }
 
             *secs -= 1;
-            if let Some(label) = countdown_label_weak.upgrade() {
-                label.set_text(&format_duration(Duration::from_secs(*secs)));
+            let duration = Duration::from_secs(*secs);
+
+            // Update all digit labels with animation
+            if let (Some(mt), Some(mo), Some(st), Some(so)) = (
+                minute_tens_weak.upgrade(),
+                minute_ones_weak.upgrade(),
+                second_tens_weak.upgrade(),
+                second_ones_weak.upgrade(),
+            ) {
+                update_countdown_digits(&mt, &mo, &st, &so, duration);
             }
+
             gtk4::glib::ControlFlow::Continue
         });
 
@@ -106,6 +188,43 @@ impl BreakWindow {
             log::info!("Break skipped by user");
             window_clone.close();
         });
+
+        // Lock screen button handler
+        lock_button.connect_clicked(|_| {
+            log::info!("Lock screen requested");
+            // Try common Linux lock commands
+            let _ = std::process::Command::new("loginctl")
+                .arg("lock-session")
+                .spawn();
+        });
+
+        // Double ESC key handler
+        let esc_press_time = Rc::new(RefCell::new(None::<std::time::Instant>));
+        let window_clone = window.clone();
+
+        let key_controller = gtk4::EventControllerKey::new();
+        let esc_press_time_clone = Rc::clone(&esc_press_time);
+
+        key_controller.connect_key_pressed(move |_, key, _code, _modifier| {
+            if key == gtk4::gdk::Key::Escape {
+                let now = std::time::Instant::now();
+                let mut last_press = esc_press_time_clone.borrow_mut();
+
+                if let Some(last_time) = *last_press {
+                    // Check if second ESC is within 1 second
+                    if now.duration_since(last_time).as_secs() < 1 {
+                        log::info!("Double ESC detected - skipping break");
+                        window_clone.close();
+                        return gtk4::glib::Propagation::Stop;
+                    }
+                }
+
+                *last_press = Some(now);
+            }
+            gtk4::glib::Propagation::Proceed
+        });
+
+        window.add_controller(key_controller);
 
         window.set_child(Some(&main_box));
 
@@ -134,14 +253,39 @@ impl BreakWindow {
 
 impl Default for BreakWindow {
     fn default() -> Self {
-        Self::new()
+        Self::new(Config::default())
     }
 }
 
-/// Format duration as MM:SS
-fn format_duration(duration: Duration) -> String {
+/// Update current time label
+fn update_current_time(label: &Label) {
+    use std::time::SystemTime;
+
+    let now = SystemTime::now();
+    let datetime = chrono::DateTime::<chrono::Local>::from(now);
+    let time_str = datetime.format("Current time is %H:%M").to_string();
+    label.set_text(&time_str);
+}
+
+/// Update countdown digit labels
+fn update_countdown_digits(
+    minute_tens: &Label,
+    minute_ones: &Label,
+    second_tens: &Label,
+    second_ones: &Label,
+    duration: Duration,
+) {
     let total_secs = duration.as_secs();
     let minutes = total_secs / 60;
     let seconds = total_secs % 60;
-    format!("{minutes:02}:{seconds:02}")
+
+    let min_tens = minutes / 10;
+    let min_ones = minutes % 10;
+    let sec_tens = seconds / 10;
+    let sec_ones = seconds % 10;
+
+    minute_tens.set_text(&min_tens.to_string());
+    minute_ones.set_text(&min_ones.to_string());
+    second_tens.set_text(&sec_tens.to_string());
+    second_ones.set_text(&sec_ones.to_string());
 }

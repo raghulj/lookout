@@ -2,24 +2,91 @@
 
 /* Break Window Styles */
 .break-window {
-    background-color: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.95);
 }
 
+/* Current time at top */
+.current-time {
+    font-size: 16px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.95);
+    letter-spacing: 0.5px;
+}
+
+/* Main heading */
+.break-heading {
+    font-size: 56px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -1px;
+}
+
+/* Instruction text */
+.break-instruction {
+    font-size: 20px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.6;
+    letter-spacing: 0.3px;
+}
+
+/* Countdown container */
+.countdown-container {
+    margin: 32px 0;
+}
+
+/* Individual countdown digits */
+.countdown-digit {
+    font-size: 120px;
+    font-weight: 400;
+    color: white;
+    min-width: 80px;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Countdown separator (colon) */
+.countdown-separator {
+    font-size: 120px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0 8px;
+}
+
+/* Fallback for break-countdown class */
 .break-countdown {
-    font-size: 72px;
-    font-weight: bold;
     color: white;
 }
 
-.break-message {
-    font-size: 24px;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 20px;
+/* Button styling */
+.break-skip-button,
+.break-lock-button {
+    min-width: 140px;
+    min-height: 48px;
+    font-size: 16px;
+    font-weight: 500;
+    border-radius: 24px;
+    background-color: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 12px 24px;
 }
 
-.break-skip-button {
-    min-width: 120px;
-    min-height: 40px;
+.break-skip-button:hover,
+.break-lock-button:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.break-skip-button:active,
+.break-lock-button:active {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Hint text */
+.break-hint {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 0.3px;
 }
 
 /* Settings Window Styles */

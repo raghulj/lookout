@@ -58,6 +58,7 @@ impl LookoutApp {
 
             // Initialize timer engine
             let config = settings.get();
+            let config_clone = config.clone();
             let timer = Arc::new(TimerEngine::new(config));
 
             // Subscribe to break events
@@ -71,13 +72,12 @@ impl LookoutApp {
                     match event {
                         crate::timer::BreakEvent::BreakStarted(break_type, duration) => {
                             log::info!("Break started: {break_type:?} for {duration:?}");
-                            // TODO: Show break window
-                            let break_window = BreakWindow::new();
+                            let break_window = BreakWindow::new(config_clone.clone());
                             break_window.show(break_type, duration);
                         }
                         crate::timer::BreakEvent::BreakEnded(break_type) => {
                             log::info!("Break ended: {break_type:?}");
-                            // TODO: Hide break window
+                            // Window closes automatically
                         }
                     }
                 }
@@ -90,8 +90,17 @@ impl LookoutApp {
             });
 
             // Initialize system tray
-            let mut tray = TrayService::new(settings.clone());
+            let (mut tray, mut test_break_rx) = TrayService::new(settings.clone());
             tray.show();
+
+            // Handle test break requests from tray
+            let timer_clone = Arc::clone(&timer);
+            tokio::spawn(async move {
+                while let Some(break_type) = test_break_rx.recv().await {
+                    log::info!("Triggering test break: {break_type:?}");
+                    timer_clone.trigger_break(break_type).await;
+                }
+            });
 
             // Update tray tooltip periodically with timer information
             let tray_clone = std::sync::Arc::new(tray);

@@ -96,7 +96,7 @@ impl TimerEngine {
     }
 
     /// Trigger a break
-    async fn trigger_break(&self, break_type: BreakType) {
+    pub async fn trigger_break(&self, break_type: BreakType) {
         let duration = match break_type {
             BreakType::Micro => {
                 Duration::from_secs(u64::from(self.config.micro_break_duration_seconds))
