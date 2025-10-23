@@ -50,9 +50,9 @@ impl LookoutApp {
         app.connect_activate(move |app| {
             log::info!("Application activated");
 
-            // Load libadwaita stylesheet
+            // Load stylesheet (embedded in binary)
             let provider = gtk4::CssProvider::new();
-            provider.load_from_path("resources/style.css");
+            provider.load_from_data(include_str!("../resources/style.css"));
             gtk4::style_context_add_provider_for_display(
                 &gtk4::gdk::Display::default().expect("Could not connect to display"),
                 &provider,
