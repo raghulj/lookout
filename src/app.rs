@@ -7,6 +7,7 @@ use crate::{
 use gtk4::glib;
 use gtk4::prelude::*;
 use libadwaita as adw;
+use libadwaita::prelude::*;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -198,24 +199,18 @@ impl Default for LookoutApp {
 
 /// Show update notification when new version is available
 fn show_update_notification(new_version: &str) {
-    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
-
-    let dialog = MessageDialog::new(
+    let dialog = adw::MessageDialog::new(
         None::<&gtk4::Window>,
-        DialogFlags::MODAL,
-        MessageType::Info,
-        ButtonsType::Ok,
-        &format!(
+        Some("Update Available"),
+        Some(&format!(
             "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nYou can install it from the Settings window.",
             env!("CARGO_PKG_VERSION"),
             new_version
-        ),
+        )),
     );
 
-    dialog.set_title(Some("Update Available"));
-    dialog.connect_response(move |dialog, _| {
-        dialog.close();
-    });
+    dialog.add_response("ok", "OK");
+    dialog.set_default_response(Some("ok"));
 
     dialog.present();
 }

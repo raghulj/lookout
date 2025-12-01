@@ -651,7 +651,7 @@ impl SettingsWindow {
         page.add(&dev_group);
 
         let links_group = adw::PreferencesGroup::builder()
-            .title("Links & Resources")
+            .title("Links and Resources")
             .build();
 
         let github_row = adw::ActionRow::builder()
@@ -719,30 +719,27 @@ fn rgba_to_string(rgba: &gtk4::gdk::RGBA) -> String {
 
 /// Show update available dialog with option to install
 fn show_update_dialog(new_version: &str) {
-    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType, ResponseType};
-
-    let message = format!(
-        "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nWould you like to install it now?",
-        env!("CARGO_PKG_VERSION"),
-        new_version
-    );
-
-    let dialog = MessageDialog::new(
+    let dialog = adw::MessageDialog::new(
         None::<&gtk4::Window>,
-        DialogFlags::MODAL,
-        MessageType::Question,
-        ButtonsType::YesNo,
-        &message,
+        Some("Update Available"),
+        Some(&format!(
+            "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nWould you like to install it now?",
+            env!("CARGO_PKG_VERSION"),
+            new_version
+        )),
     );
 
-    dialog.set_title(Some("Update Available"));
+    dialog.add_response("no", "No");
+    dialog.add_response("yes", "Yes");
+    dialog.set_response_appearance("yes", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("yes"));
 
     let new_version = new_version.to_string();
-    dialog.connect_response(move |dialog, response| {
-        if response == ResponseType::Yes {
+    dialog.connect_response(None, move |dlg, response| {
+        dlg.close();
+        if response == "yes" {
             perform_update_with_progress(&new_version);
         }
-        dialog.close();
     });
 
     dialog.present();
@@ -750,46 +747,26 @@ fn show_update_dialog(new_version: &str) {
 
 /// Perform update with progress indication
 fn perform_update_with_progress(new_version: &str) {
-    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
-
-    let progress_dialog = MessageDialog::new(
+    let dialog = adw::MessageDialog::new(
         None::<&gtk4::Window>,
-        DialogFlags::MODAL,
-        MessageType::Info,
-        ButtonsType::None,
-        &format!(
+        Some("Installing Update"),
+        Some(&format!(
             "Downloading and installing version {}...\n\nThis may take a moment.",
             new_version
-        ),
+        )),
     );
 
-    progress_dialog.set_title(Some("Installing Update"));
+    // No buttons - this is a progress dialog
+    dialog.present();
 
-    let spinner_box = GtkBox::new(Orientation::Horizontal, 12);
-    spinner_box.set_halign(Align::Center);
-    spinner_box.set_margin_top(12);
-    spinner_box.set_margin_bottom(12);
-
-    let spinner = Spinner::new();
-    spinner.start();
-    let status_label = Label::new(Some("Downloading..."));
-
-    spinner_box.append(&spinner);
-    spinner_box.append(&status_label);
-
-    // For GTK4 MessageDialog, we can't set extra child, so we'll just use the message
-    progress_dialog.present();
-
-    // Perform update in background
-    let status_label_clone = status_label.clone();
-    let progress_dialog_clone = progress_dialog.clone();
+    let dialog_clone = dialog.clone();
 
     gtk4::glib::spawn_future_local(async move {
         let result = updater::perform_update().await;
 
         match result {
             Ok(version) => {
-                status_label_clone.set_text("Update successful! Restarting...");
+                dialog_clone.set_body("Update successful! Restarting...");
 
                 // Wait a moment for user to see the message
                 gtk4::glib::timeout_add_seconds_local_once(2, move || {
@@ -805,7 +782,7 @@ fn perform_update_with_progress(new_version: &str) {
                 });
             },
             Err(e) => {
-                progress_dialog_clone.close();
+                dialog_clone.close();
                 show_error_dialog(&format!("Update failed: {}", e));
                 log::error!("Update failed: {}", e);
             },
@@ -815,20 +792,11 @@ fn perform_update_with_progress(new_version: &str) {
 
 /// Show error dialog
 fn show_error_dialog(message: &str) {
-    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
+    let dialog =
+        adw::MessageDialog::new(None::<&gtk4::Window>, Some("Update Error"), Some(message));
 
-    let dialog = MessageDialog::new(
-        None::<&gtk4::Window>,
-        DialogFlags::MODAL,
-        MessageType::Error,
-        ButtonsType::Ok,
-        message,
-    );
-
-    dialog.set_title(Some("Update Error"));
-    dialog.connect_response(move |dialog, _| {
-        dialog.close();
-    });
+    dialog.add_response("ok", "OK");
+    dialog.set_default_response(Some("ok"));
 
     dialog.present();
 }
