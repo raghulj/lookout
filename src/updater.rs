@@ -199,9 +199,7 @@ pub fn restart_application() -> Result<(), Box<dyn Error + Send + Sync>> {
     info!("Executing update script and exiting: {:?}", script_path);
 
     // Launch the update script in the background
-    std::process::Command::new("sh")
-        .arg(&script_path)
-        .spawn()?;
+    std::process::Command::new("sh").arg(&script_path).spawn()?;
 
     // Exit current process so the script can replace the binary
     std::process::exit(0);
