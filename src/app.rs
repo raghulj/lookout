@@ -4,8 +4,10 @@ use crate::{
     autostart::AutostartManager, break_window::BreakWindow, settings::Settings, timer::TimerEngine,
     tray::TrayService, updater,
 };
+use gtk4::glib;
 use gtk4::prelude::*;
-use gtk4::{glib, Application};
+use libadwaita as adw;
+use libadwaita::prelude::*;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -25,12 +27,13 @@ impl LookoutApp {
 
     /// Run the application
     pub fn run(self) -> Result<(), Box<dyn Error>> {
-        log::info!("Initializing GTK4 application");
+        log::info!("Initializing GTK4 application with libadwaita");
 
-        // Initialize GTK4 application
+        // Initialize libadwaita application
+        // This ensures proper styling for all adw:: widgets
         // GTK4 Application automatically ensures single instance through D-Bus
         // If another instance is running, this one will exit automatically
-        let app = Application::builder().application_id(APP_ID).build();
+        let app = adw::Application::builder().application_id(APP_ID).build();
 
         let settings = self.settings;
 
@@ -196,24 +199,18 @@ impl Default for LookoutApp {
 
 /// Show update notification when new version is available
 fn show_update_notification(new_version: &str) {
-    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
-
-    let dialog = MessageDialog::new(
+    let dialog = adw::MessageDialog::new(
         None::<&gtk4::Window>,
-        DialogFlags::MODAL,
-        MessageType::Info,
-        ButtonsType::Ok,
-        &format!(
+        Some("Update Available"),
+        Some(&format!(
             "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nYou can install it from the Settings window.",
             env!("CARGO_PKG_VERSION"),
             new_version
-        ),
+        )),
     );
 
-    dialog.set_title(Some("Update Available"));
-    dialog.connect_response(move |dialog, _| {
-        dialog.close();
-    });
+    dialog.add_response("ok", "OK");
+    dialog.set_default_response(Some("ok"));
 
     dialog.present();
 }
