@@ -4,8 +4,9 @@ use crate::{
     autostart::AutostartManager, break_window::BreakWindow, settings::Settings, timer::TimerEngine,
     tray::TrayService, updater,
 };
+use gtk4::glib;
 use gtk4::prelude::*;
-use gtk4::{glib, Application};
+use libadwaita as adw;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -25,12 +26,13 @@ impl LookoutApp {
 
     /// Run the application
     pub fn run(self) -> Result<(), Box<dyn Error>> {
-        log::info!("Initializing GTK4 application");
+        log::info!("Initializing GTK4 application with libadwaita");
 
-        // Initialize GTK4 application
+        // Initialize libadwaita application
+        // This ensures proper styling for all adw:: widgets
         // GTK4 Application automatically ensures single instance through D-Bus
         // If another instance is running, this one will exit automatically
-        let app = Application::builder().application_id(APP_ID).build();
+        let app = adw::Application::builder().application_id(APP_ID).build();
 
         let settings = self.settings;
 
