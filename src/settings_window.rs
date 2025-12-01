@@ -263,7 +263,7 @@ impl SettingsWindow {
             gtk4::glib::Propagation::Proceed
         });
 
-        prefs_page.add(&idle_group);
+        page.add(&idle_group);
 
         // Save button in its own group
         let button_group = adw::PreferencesGroup::new();
