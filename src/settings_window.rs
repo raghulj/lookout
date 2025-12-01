@@ -33,10 +33,24 @@ impl SettingsWindow {
     /// Build and show the settings window
     #[allow(clippy::too_many_lines)]
     pub fn show(&self) {
+        self.show_page(None);
+    }
+
+    /// Show the settings window with the About page selected
+    pub fn show_about(&self) {
+        self.show_page(Some("about"));
+    }
+
+    /// Build and show the settings window, optionally navigating to a specific page
+    #[allow(clippy::too_many_lines)]
+    fn show_page(&self, page_name: Option<&str>) {
         log::info!("Opening settings window");
 
         // Check if window already exists
         if let Some(window) = self.window.borrow().as_ref() {
+            if let Some(name) = page_name {
+                window.set_visible_page_name(name);
+            }
             window.present();
             return;
         }
@@ -64,6 +78,11 @@ impl SettingsWindow {
         window.add(&messages_page);
         window.add(&appearance_page);
         window.add(&about_page);
+
+        // Navigate to requested page if specified
+        if let Some(name) = page_name {
+            window.set_visible_page_name(name);
+        }
 
         // Store window reference
         *self.window.borrow_mut() = Some(window.clone());
