@@ -1,6 +1,7 @@
 //! Break timer engine with tokio async timers
 
 use crate::config::Config;
+use crate::idle;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 use tokio::time::{interval, Duration, Instant};
@@ -35,6 +36,8 @@ pub struct TimerEngine {
     next_micro_break: Arc<RwLock<Instant>>,
     next_long_break: Arc<RwLock<Instant>>,
     event_sender: broadcast::Sender<BreakEvent>,
+    /// Tracks whether the user was idle in the previous tick
+    was_idle: Arc<RwLock<bool>>,
 }
 
 impl TimerEngine {
@@ -53,6 +56,7 @@ impl TimerEngine {
             next_micro_break: Arc::new(RwLock::new(now + micro_interval)),
             next_long_break: Arc::new(RwLock::new(now + long_interval)),
             event_sender,
+            was_idle: Arc::new(RwLock::new(false)),
         }
     }
 
@@ -77,6 +81,26 @@ impl TimerEngine {
                 continue;
             }
 
+            // Check idle detection if enabled
+            let config = self.config.read().await;
+            if config.idle_detection_enabled {
+                let threshold = Duration::from_secs(u64::from(config.idle_threshold_minutes) * 60);
+                drop(config); // Release lock before calling idle detection
+
+                let is_idle_now = idle::is_user_idle(threshold);
+                let was_idle = *self.was_idle.read().await;
+
+                if was_idle && !is_idle_now {
+                    // User just returned from being idle - reset all timers!
+                    log::info!("User returned from idle state, resetting break timers");
+                    self.reset_all_timers().await;
+                }
+
+                *self.was_idle.write().await = is_idle_now;
+            } else {
+                drop(config);
+            }
+
             let now = Instant::now();
 
             // Check for micro break
@@ -93,6 +117,26 @@ impl TimerEngine {
                 self.trigger_break(BreakType::Long).await;
             }
         }
+    }
+
+    /// Reset all timers to their full intervals
+    /// Called when user returns from being idle
+    async fn reset_all_timers(&self) {
+        let now = Instant::now();
+        let config = self.config.read().await;
+
+        let micro_interval =
+            Duration::from_secs(u64::from(config.micro_break_interval_minutes) * 60);
+        let long_interval = Duration::from_secs(u64::from(config.long_break_interval_minutes) * 60);
+
+        *self.next_micro_break.write().await = now + micro_interval;
+        *self.next_long_break.write().await = now + long_interval;
+
+        log::info!(
+            "Timers reset after idle - next micro break in {:?}, next long break in {:?}",
+            micro_interval,
+            long_interval
+        );
     }
 
     /// Trigger a break

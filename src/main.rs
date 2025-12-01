@@ -2,6 +2,7 @@ mod app;
 mod autostart;
 mod break_window;
 mod config;
+mod idle;
 mod settings;
 mod settings_window;
 mod timer;

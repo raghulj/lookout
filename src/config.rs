@@ -97,10 +97,20 @@ pub struct Config {
     /// Automatically check for updates on startup
     #[serde(default = "default_auto_update_check")]
     pub auto_update_check: bool,
+    /// Enable idle detection to reset timers when user returns from being away
+    #[serde(default)]
+    pub idle_detection_enabled: bool,
+    /// Idle threshold in minutes - reset timers if user was idle for this long
+    #[serde(default = "default_idle_threshold_minutes")]
+    pub idle_threshold_minutes: u32,
 }
 
-fn default_auto_update_check() -> bool {
+const fn default_auto_update_check() -> bool {
     true
+}
+
+const fn default_idle_threshold_minutes() -> u32 {
+    5 // Default: 5 minutes of inactivity means user was "away"
 }
 
 fn default_background_color() -> String {
@@ -124,6 +134,8 @@ impl Default for Config {
             text_color: default_text_color(),
             break_messages: BreakMessages::default(),
             auto_update_check: default_auto_update_check(),
+            idle_detection_enabled: false, // Disabled by default, user opts in
+            idle_threshold_minutes: default_idle_threshold_minutes(),
         }
     }
 }

@@ -37,6 +37,11 @@ env_logger = "0.11"
 # Self-update functionality
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
+# Idle time detection via D-Bus (works on both X11 and Wayland)
+# Note: On GNOME, uses org.gnome.Mutter.IdleMonitor
+# Disabled default x11 feature to avoid requiring libxss on Wayland systems
+user-idle = { version = "0.6", default-features = false, features = ["dbus"] }
+
 [dev-dependencies]
 # Testing utilities can be added here
 
