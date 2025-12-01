@@ -224,6 +224,48 @@ impl SettingsWindow {
         page.add(&updates_group);
 
         // Save button group
+        // Idle detection group
+        let idle_group = adw::PreferencesGroup::new();
+        idle_group.set_title("Idle Detection");
+        idle_group.set_description(Some(
+            "Reset break timers when you return after being away from the computer",
+        ));
+        idle_group.set_margin_bottom(24);
+
+        // Enable idle detection
+        let idle_enabled_row = adw::ActionRow::new();
+        idle_enabled_row.set_title("Enable Idle Detection");
+        idle_enabled_row.set_subtitle(
+            "Automatically reset timers if you've been away (no keyboard/mouse activity)",
+        );
+        let idle_enabled_switch = Switch::new();
+        idle_enabled_switch.set_active(config.idle_detection_enabled);
+        idle_enabled_switch.set_valign(Align::Center);
+        idle_enabled_row.add_suffix(&idle_enabled_switch);
+        idle_enabled_row.set_activatable_widget(Some(&idle_enabled_switch));
+        idle_group.add(&idle_enabled_row);
+
+        // Idle threshold
+        let idle_threshold_row = adw::ActionRow::new();
+        idle_threshold_row.set_title("Idle Threshold");
+        idle_threshold_row.set_subtitle("Minutes of inactivity before considering you 'away'");
+        let idle_threshold_spin = SpinButton::with_range(1.0, 30.0, 1.0);
+        idle_threshold_spin.set_value(f64::from(config.idle_threshold_minutes));
+        idle_threshold_spin.set_valign(Align::Center);
+        idle_threshold_row.add_suffix(&idle_threshold_spin);
+        idle_group.add(&idle_threshold_row);
+
+        // Enable/disable threshold spin based on idle detection toggle
+        idle_threshold_spin.set_sensitive(config.idle_detection_enabled);
+        let idle_threshold_spin_clone = idle_threshold_spin.clone();
+        idle_enabled_switch.connect_state_set(move |_, state| {
+            idle_threshold_spin_clone.set_sensitive(state);
+            gtk4::glib::Propagation::Proceed
+        });
+
+        prefs_page.add(&idle_group);
+
+        // Save button in its own group
         let button_group = adw::PreferencesGroup::new();
 
         let button_box = GtkBox::new(Orientation::Horizontal, 12);
@@ -234,6 +276,7 @@ impl SettingsWindow {
         save_button.add_css_class("suggested-action");
 
         let settings_clone = self.settings.clone();
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         save_button.connect_clicked(move |_| {
             let new_auto_start = autostart_switch.is_active();
 
@@ -241,6 +284,8 @@ impl SettingsWindow {
                 cfg.enabled = enabled_switch.is_active();
                 cfg.auto_start = new_auto_start;
                 cfg.auto_update_check = auto_update_switch.is_active();
+                cfg.idle_detection_enabled = idle_enabled_switch.is_active();
+                cfg.idle_threshold_minutes = idle_threshold_spin.value() as u32;
             }) {
                 log::error!("Failed to save general settings: {e}");
             } else {
