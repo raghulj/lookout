@@ -4,6 +4,8 @@ use crate::settings::Settings;
 use crate::timer::BreakType;
 use gtk4::prelude::*;
 use ksni::{menu, Tray, TrayService as KsniTrayService};
+use libadwaita as adw;
+use libadwaita::prelude::*;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
@@ -113,15 +115,17 @@ impl Tray for LookoutTray {
 
         items.push(MenuItem::Separator);
 
-        // About
+        // About - opens Settings window on About tab
         items.push(
             StandardItem {
                 label: "About".to_string(),
                 icon_name: "help-about".to_string(),
-                activate: Box::new(|_this: &mut Self| {
-                    log::info!("About clicked");
-                    gtk4::glib::MainContext::default().invoke(|| {
-                        show_about_dialog();
+                activate: Box::new(|this: &mut Self| {
+                    log::info!("Opening About from tray");
+                    let settings = this.settings.clone();
+                    gtk4::glib::MainContext::default().invoke(move || {
+                        let settings_window = crate::settings_window::SettingsWindow::new(settings);
+                        settings_window.show_about();
                     });
                 }),
                 ..Default::default()
@@ -216,58 +220,28 @@ impl TrayService {
     }
 }
 
-/// Show the About dialog
-fn show_about_dialog() {
-    let dialog = gtk4::AboutDialog::builder()
-        .program_name("Lookout")
-        .version("0.1.0")
-        .license_type(gtk4::License::MitX11)
-        .website("https://github.com/raghulj/lookout")
-        .copyright("© 2024")
-        .comments("A lightweight break reminder app for Linux that helps reduce eye strain and digital fatigue.\n\n🤖 This application was developed and is maintained entirely using Claude Code (AI).")
-        .logo_icon_name("appointment-soon")
-        .modal(true)
-        .build();
-
-    // Add developers
-    dialog.set_authors(&["Developed by Claude Code (AI)"]);
-
-    // Add designers
-    dialog.set_artists(&["Claude Code (AI)"]);
-
-    dialog.present();
-}
-
 /// Check for updates from tray menu
 fn check_for_updates_from_tray() {
     use crate::updater;
-    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType};
 
     if !updater::can_self_update() {
-        let dialog = MessageDialog::new(
+        let dialog = adw::MessageDialog::new(
             None::<&gtk4::Window>,
-            DialogFlags::MODAL,
-            MessageType::Warning,
-            ButtonsType::Ok,
-            "Self-update is disabled because Lookout was installed via a package manager.\n\nPlease use your system's package manager to update.",
+            Some("Self-update Disabled"),
+            Some("Self-update is disabled because Lookout was installed via a package manager.\n\nPlease use your system's package manager to update."),
         );
-        dialog.set_title(Some("Self-update Disabled"));
-        dialog.connect_response(move |dialog, _| {
-            dialog.close();
-        });
+        dialog.add_response("ok", "OK");
+        dialog.set_default_response(Some("ok"));
         dialog.present();
         return;
     }
 
     // Show checking dialog
-    let checking_dialog = MessageDialog::new(
+    let checking_dialog = adw::MessageDialog::new(
         None::<&gtk4::Window>,
-        DialogFlags::MODAL,
-        MessageType::Info,
-        ButtonsType::None,
-        "Please wait while we check for updates...",
+        Some("Checking for Updates"),
+        Some("Please wait while we check for updates..."),
     );
-    checking_dialog.set_title(Some("Checking for Updates"));
     checking_dialog.present();
 
     // Check for updates in background
@@ -281,34 +255,26 @@ fn check_for_updates_from_tray() {
                 show_tray_update_dialog(&new_version);
             },
             Ok(None) => {
-                let dialog = MessageDialog::new(
+                let dialog = adw::MessageDialog::new(
                     None::<&gtk4::Window>,
-                    DialogFlags::MODAL,
-                    MessageType::Info,
-                    ButtonsType::Ok,
-                    &format!(
+                    Some("Up to Date"),
+                    Some(&format!(
                         "You're already running the latest version (v{})!",
                         env!("CARGO_PKG_VERSION")
-                    ),
+                    )),
                 );
-                dialog.set_title(Some("Up to Date"));
-                dialog.connect_response(move |dialog, _| {
-                    dialog.close();
-                });
+                dialog.add_response("ok", "OK");
+                dialog.set_default_response(Some("ok"));
                 dialog.present();
             },
             Err(e) => {
-                let dialog = MessageDialog::new(
+                let dialog = adw::MessageDialog::new(
                     None::<&gtk4::Window>,
-                    DialogFlags::MODAL,
-                    MessageType::Error,
-                    ButtonsType::Ok,
-                    &e.to_string(),
+                    Some("Update Check Failed"),
+                    Some(&e.to_string()),
                 );
-                dialog.set_title(Some("Update Check Failed"));
-                dialog.connect_response(move |dialog, _| {
-                    dialog.close();
-                });
+                dialog.add_response("ok", "OK");
+                dialog.set_default_response(Some("ok"));
                 dialog.present();
                 log::error!("Update check failed: {}", e);
             },
@@ -319,52 +285,52 @@ fn check_for_updates_from_tray() {
 /// Show update dialog from tray
 fn show_tray_update_dialog(new_version: &str) {
     use crate::updater;
-    use gtk4::{ButtonsType, DialogFlags, MessageDialog, MessageType, ResponseType};
 
-    let message = format!(
-        "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nWould you like to install it now?",
-        env!("CARGO_PKG_VERSION"),
-        new_version
-    );
-
-    let dialog = MessageDialog::new(
+    let dialog = adw::MessageDialog::new(
         None::<&gtk4::Window>,
-        DialogFlags::MODAL,
-        MessageType::Question,
-        ButtonsType::YesNo,
-        &message,
+        Some("Update Available"),
+        Some(&format!(
+            "A new version of Lookout is available!\n\nCurrent: v{}\nLatest: v{}\n\nWould you like to install it now?",
+            env!("CARGO_PKG_VERSION"),
+            new_version
+        )),
     );
 
-    dialog.set_title(Some("Update Available"));
+    dialog.add_response("no", "No");
+    dialog.add_response("yes", "Yes");
+    dialog.set_response_appearance("yes", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("yes"));
 
     let new_version = new_version.to_string();
-    dialog.connect_response(move |dialog, response| {
-        if response == ResponseType::Yes {
-            let progress_dialog = MessageDialog::new(
+    dialog.connect_response(None, move |dlg, response| {
+        dlg.close();
+        if response == "yes" {
+            let progress_dialog = adw::MessageDialog::new(
                 None::<&gtk4::Window>,
-                DialogFlags::MODAL,
-                MessageType::Info,
-                ButtonsType::None,
-                &format!("Downloading and installing version {}...", new_version),
+                Some("Installing Update"),
+                Some(&format!(
+                    "Downloading and installing version {}...",
+                    new_version
+                )),
             );
-            progress_dialog.set_title(Some("Installing Update"));
             progress_dialog.present();
+
+            let progress_dialog_clone = progress_dialog.clone();
+            let new_version_clone = new_version.clone();
 
             gtk4::glib::spawn_future_local(async move {
                 let result = updater::perform_update().await;
 
                 match result {
                     Ok(_version) => {
-                        progress_dialog.close();
+                        progress_dialog_clone.close();
 
-                        let success_dialog = MessageDialog::new(
+                        let success_dialog = adw::MessageDialog::new(
                             None::<&gtk4::Window>,
-                            DialogFlags::MODAL,
-                            MessageType::Info,
-                            ButtonsType::Ok,
-                            "Update installed successfully! Restarting Lookout...",
+                            Some("Update Successful"),
+                            Some("Update installed successfully! Restarting Lookout..."),
                         );
-                        success_dialog.set_title(Some("Update Successful"));
+                        success_dialog.add_response("ok", "OK");
                         success_dialog.present();
 
                         gtk4::glib::timeout_add_seconds_local_once(2, || {
@@ -374,24 +340,20 @@ fn show_tray_update_dialog(new_version: &str) {
                         });
                     },
                     Err(e) => {
-                        progress_dialog.close();
-                        let error_dialog = MessageDialog::new(
+                        progress_dialog_clone.close();
+                        let error_dialog = adw::MessageDialog::new(
                             None::<&gtk4::Window>,
-                            DialogFlags::MODAL,
-                            MessageType::Error,
-                            ButtonsType::Ok,
-                            &format!("Failed to install update: {}", e),
+                            Some("Update Failed"),
+                            Some(&format!("Failed to install update: {}", e)),
                         );
-                        error_dialog.set_title(Some("Update Failed"));
-                        error_dialog.connect_response(move |dialog, _| {
-                            dialog.close();
-                        });
+                        error_dialog.add_response("ok", "OK");
+                        error_dialog.set_default_response(Some("ok"));
                         error_dialog.present();
+                        log::error!("Update failed for version {}: {}", new_version_clone, e);
                     },
                 }
             });
         }
-        dialog.close();
     });
 
     dialog.present();
